@@ -1,0 +1,981 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Retirement">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f3f6f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1412" media="(prefers-color-scheme: dark)">
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Retirement Income Simulator</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: inputs in a narrow left rail, answer first on the right (headline odds, then charts, then the ledger). On a phone: answer, inputs, detail. */
+:root {
+  --bg: #f3f6f4; --surface: #fcfdfc; --field: #ffffff;
+  --ink: #13201b; --ink-2: #48574f; --muted: #76847d;
+  --line: #dde4e0; --line-strong: #c2ccc7;
+  --accent: #1c6a58; --accent-soft: #dcebe6; --on-accent: #ffffff;
+  --s-cpp: #2a78d6; --s-oas: #eb6834; --s-db: #1baf7a; --s-rrsp: #eda100; --s-nonreg: #e87ba4; --s-tfsa: #008300;
+  --good: #0ca30c; --warn: #fab219; --crit: #d03b3b;
+  --shadow: 0 6px 24px rgba(19, 32, 27, 0.14);
+  --display: "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1412; --surface: #171e1b; --field: #111815;
+    --ink: #f1f5f3; --ink-2: #b7c3bd; --muted: #85928c;
+    --line: #27312d; --line-strong: #3a4640;
+    --accent: #5dbba3; --accent-soft: #1d2e29; --on-accent: #0e1412;
+    --s-cpp: #3987e5; --s-oas: #d95926; --s-db: #199e70; --s-rrsp: #c98500; --s-nonreg: #d55181; --s-tfsa: #008300;
+    --good: #0ca30c; --warn: #fab219; --crit: #d03b3b;
+    --shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1412; --surface: #171e1b; --field: #111815;
+  --ink: #f1f5f3; --ink-2: #b7c3bd; --muted: #85928c;
+  --line: #27312d; --line-strong: #3a4640;
+  --accent: #5dbba3; --accent-soft: #1d2e29; --on-accent: #0e1412;
+  --s-cpp: #3987e5; --s-oas: #d95926; --s-db: #199e70; --s-rrsp: #c98500; --s-nonreg: #d55181; --s-tfsa: #008300;
+  --good: #0ca30c; --warn: #fab219; --crit: #d03b3b;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 56px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(1.7rem, 3.4vw, 2.3rem); line-height: 1.1; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 1.05rem; font-weight: 600; margin: 0; text-wrap: balance; }
+p { margin: 0; }
+.masthead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; margin-bottom: 16px; }
+.scenario { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 20px; }
+.scenario > span { font-weight: 600; font-size: 0.78rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); }
+.segments { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 9px; }
+.segments label { position: relative; cursor: pointer; }
+.segments input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.segments label span { display: block; padding: 6px 14px; border-radius: 6px; font-weight: 500; color: var(--ink-2); }
+.segments label:hover span { color: var(--ink); }
+.segments input:checked + span { background: var(--accent); color: var(--on-accent); }
+.segments input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+form[data-mode="a"] [data-who="b"], form[data-mode="b"] [data-who="a"], form:not([data-mode="joint"]) .who, form:not([data-mode="joint"]) #hint-stagger { display: none; }
+form:not([data-mode="joint"]) .pair { grid-template-columns: minmax(0, 1fr); }
+.masthead p { color: var(--ink-2); }
+.layout { display: grid; grid-template-columns: 352px minmax(0, 1fr); grid-template-areas: "inputs summary" "inputs results"; grid-template-rows: auto 1fr; gap: 20px 24px; align-items: start; }
+.summary { grid-area: summary; min-width: 0; }
+.inputs { grid-area: inputs; min-width: 0; }
+.results { grid-area: results; min-width: 0; display: grid; gap: 20px; }
+@media (max-width: 880px) {
+  .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; grid-template-areas: "summary" "inputs" "results"; }
+}
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; min-width: 0; }
+
+/* Headline */
+.summary .panel { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px 32px; }
+@media (max-width: 640px) { .summary .panel { grid-template-columns: minmax(0, 1fr); } }
+.odds-num { font-size: clamp(3rem, 8vw, 4.4rem); font-weight: 600; line-height: 1; letter-spacing: -0.02em; }
+.odds-label { font-size: 1.05rem; font-weight: 500; margin-top: 6px; }
+.odds-text { color: var(--ink-2); margin-top: 10px; max-width: 46ch; }
+.pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); border-radius: 999px; padding: 2px 10px 2px 7px; font-size: 0.82rem; font-weight: 600; margin-bottom: 10px; }
+.pill svg { width: 14px; height: 14px; flex: none; }
+.stats { display: grid; gap: 12px; align-content: center; }
+.stat { display: grid; gap: 1px; padding-left: 14px; border-left: 2px solid var(--line); }
+.stat dt { color: var(--ink-2); font-size: 0.86rem; }
+.stat dd { margin: 0; font-size: 1.35rem; font-weight: 600; }
+.stat .sub { color: var(--muted); font-size: 0.82rem; }
+dl { margin: 0; }
+
+/* Inputs */
+.inputs form { display: grid; gap: 0; padding: 0; }
+.example-note { font-size: 0.86rem; color: var(--ink-2); background: var(--accent-soft); border-radius: 10px 10px 0 0; padding: 10px 20px; }
+fieldset { border: 0; border-top: 1px solid var(--line); margin: 0; padding: 14px 20px 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; min-width: 0; }
+.example-note + fieldset { border-top: 0; }
+legend { font-weight: 600; font-size: 0.78rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); padding: 0; margin-bottom: 8px; float: left; width: 100%; grid-column: 1 / -1; }
+.field { display: grid; gap: 3px; min-width: 0; align-content: start; }
+.field.wide { grid-column: 1 / -1; }
+.who { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; font-weight: 600; font-size: 0.86rem; }
+.pair { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 12px; min-width: 0; }
+.pair > .pair-label, .pair > .hint { grid-column: 1 / -1; }
+.pair-label { font-size: 0.84rem; color: var(--ink-2); }
+.pair .check { grid-column: auto; }
+fieldset > .hint { grid-column: 1 / -1; }
+.field label { font-size: 0.84rem; color: var(--ink-2); }
+.control { display: flex; align-items: center; background: var(--field); border: 1px solid var(--line-strong); border-radius: 6px; min-width: 0; }
+.control:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.affix { color: var(--muted); padding: 0 0 0 9px; font-size: 0.9rem; }
+.affix.end { padding: 0 9px 0 0; }
+.control input, .control select { flex: 1; min-width: 0; width: 100%; border: 0; background: transparent; color: var(--ink); font: inherit; font-variant-numeric: tabular-nums; padding: 7px 9px; outline: none; }
+.control select { padding-right: 4px; }
+.hint { font-size: 0.78rem; color: var(--muted); }
+input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 0; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 0.86rem; color: var(--ink-2); grid-column: 1 / -1; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
+.actions { border-top: 1px solid var(--line); padding: 12px 20px; }
+button { font: inherit; font-weight: 500; color: var(--ink); background: transparent; border: 1px solid var(--line-strong); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); color: var(--accent); }
+button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Charts */
+.chart-head { display: grid; gap: 2px; margin-bottom: 10px; }
+.chart-head p { color: var(--ink-2); font-size: 0.9rem; max-width: 70ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.82rem; color: var(--ink-2); margin-bottom: 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 2px; flex: none; }
+.legend i.line { height: 2px; width: 16px; border-radius: 1px; }
+.plot { position: relative; }
+.plot svg { display: block; width: 100%; touch-action: pan-y; }
+.plot text { font-family: var(--body); font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.plot text.strong { fill: var(--ink); font-weight: 600; }
+.plot text.halo { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.tip { position: absolute; top: 0; left: 0; pointer-events: none; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: var(--shadow); padding: 8px 10px; font-size: 0.82rem; min-width: 170px; z-index: 2; }
+.tip h3 { margin: 0 0 4px; font-size: 0.82rem; font-weight: 600; }
+.tip .row { display: flex; justify-content: space-between; gap: 14px; color: var(--ink-2); }
+.tip .row b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tip .row span { display: inline-flex; align-items: center; gap: 6px; }
+.tip .row i { width: 10px; height: 2px; flex: none; }
+.tip .rule { border-top: 1px solid var(--line); margin: 4px 0; }
+
+/* Retirement age comparison */
+.ages { display: grid; gap: 6px; }
+.age-row { display: grid; grid-template-columns: 8.6em minmax(0, 1fr) 3.2em; align-items: center; gap: 10px; font-size: 0.9rem; color: var(--ink-2); }
+.age-row .track { height: 10px; background: var(--accent-soft); border-radius: 2px; overflow: hidden; }
+.age-row .fill { height: 100%; background: var(--line-strong); border-radius: 0 4px 4px 0; }
+.age-row b { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+.age-row.current { color: var(--ink); font-weight: 600; }
+.age-row.current .fill { background: var(--accent); }
+.age-row.current b { font-weight: 600; }
+
+/* Ledger */
+.table-scroll { overflow: auto; max-height: 440px; border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 7px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+th { position: sticky; top: 0; background: var(--surface); color: var(--ink-2); font-weight: 600; z-index: 1; box-shadow: 0 1px 0 var(--line-strong); }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+tr:last-child td { border-bottom: 0; }
+td.short { color: var(--crit); font-weight: 600; }
+td.zero { color: var(--muted); }
+
+.notes ul { margin: 8px 0 0; padding-left: 18px; color: var(--ink-2); display: grid; gap: 5px; max-width: 78ch; font-size: 0.9rem; }
+.notes p { color: var(--ink-2); font-size: 0.9rem; max-width: 78ch; margin-top: 10px; }
+.notes a { color: var(--accent); }
+details summary { cursor: pointer; font-weight: 600; }
+.pending { opacity: 0.55; }
+@media (prefers-reduced-motion: no-preference) { .age-row .fill { transition: width 0.25s ease; } }
+/* iPhone zooms the page when a focused field is under 16px */
+@media (pointer: coarse) { .control input, .control select { font-size: 16px; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <h1>Retirement Income Simulator</h1>
+    <p>Ontario, 2026 tax rules. Every figure is in today's dollars.</p>
+  </header>
+
+  <div class="scenario">
+    <span id="scenario-label">Scenario</span>
+    <div class="segments" role="radiogroup" aria-labelledby="scenario-label">
+      <label><input type="radio" name="mode" id="mode-joint" value="joint" checked><span>Both of us</span></label>
+      <label><input type="radio" name="mode" id="mode-a" value="a"><span>Just me</span></label>
+      <label><input type="radio" name="mode" id="mode-b" value="b"><span>Just my wife</span></label>
+    </div>
+  </div>
+
+  <div class="layout">
+    <section class="summary" aria-live="polite">
+      <div class="panel">
+        <div>
+          <div class="pill" id="pill"></div>
+          <div class="odds-num" id="odds-num">–</div>
+          <div class="odds-label" id="odds-label"></div>
+          <p class="odds-text" id="odds-text"></p>
+        </div>
+        <dl class="stats">
+          <div class="stat"><dt id="st-ret-label">Median savings when you have both retired</dt><dd id="st-ret">–</dd><span class="sub" id="st-ret-sub"></span></div>
+          <div class="stat"><dt>Spending that holds up in 9 of 10 paths</dt><dd id="st-safe">–</dd><span class="sub" id="st-safe-sub"></span></div>
+          <div class="stat"><dt id="st-end-label">Median left at the end</dt><dd id="st-end">–</dd><span class="sub">before tax on any remaining RRSP</span></div>
+        </dl>
+      </div>
+    </section>
+
+    <aside class="inputs">
+      <form class="panel" id="form" data-mode="joint" autocomplete="off" novalidate>
+        <p class="example-note" id="example-note">These are example figures. Replace them with your own.</p>
+        <fieldset>
+          <legend id="lg-people">The two of you</legend>
+          <div class="who" aria-hidden="true"><span>You</span><span>Your wife</span></div>
+          <div class="pair"><span class="pair-label">Age now</span>
+            <div class="control"><input id="a-age" aria-label="Age now, you" type="number" inputmode="numeric" min="18" max="90" step="1"></div>
+            <div class="control"><input id="b-age" aria-label="Age now, your wife" type="number" inputmode="numeric" min="18" max="90" step="1"></div></div>
+          <div class="pair"><span class="pair-label">Retirement age</span>
+            <div class="control"><input id="a-retire" aria-label="Retirement age, you" type="number" inputmode="numeric" min="40" max="75" step="1"></div>
+            <div class="control"><input id="b-retire" aria-label="Retirement age, your wife" type="number" inputmode="numeric" min="40" max="75" step="1"></div></div>
+          <p class="hint" id="hint-stagger">Savings are drawn from the year you have both retired. Until then, the one still working is assumed to cover your spending.</p>
+          <div class="field wide"><label for="in-end" id="lb-end">Plan until the younger of you is</label><div class="control"><input id="in-end" type="number" inputmode="numeric" min="70" max="110" step="1"></div></div>
+        </fieldset>
+        <fieldset>
+          <legend>Savings today</legend>
+          <div class="who" aria-hidden="true"><span>You</span><span>Your wife</span></div>
+          <div class="pair"><span class="pair-label">RRSP / RRIF</span>
+            <div class="control"><span class="affix">$</span><input id="a-rrsp" aria-label="RRSP / RRIF, you" type="number" inputmode="numeric" min="0" step="5000"></div>
+            <div class="control"><span class="affix">$</span><input id="b-rrsp" aria-label="RRSP / RRIF, your wife" type="number" inputmode="numeric" min="0" step="5000"></div></div>
+          <div class="pair"><span class="pair-label">TFSA</span>
+            <div class="control"><span class="affix">$</span><input id="a-tfsa" aria-label="TFSA, you" type="number" inputmode="numeric" min="0" step="5000"></div>
+            <div class="control"><span class="affix">$</span><input id="b-tfsa" aria-label="TFSA, your wife" type="number" inputmode="numeric" min="0" step="5000"></div></div>
+          <div class="field wide"><label for="in-nonreg" id="lb-nonreg">Joint non-registered investments</label><div class="control"><span class="affix">$</span><input id="in-nonreg" type="number" inputmode="numeric" min="0" step="5000"></div></div>
+        </fieldset>
+        <fieldset>
+          <legend>Saved each year while working</legend>
+          <div class="who" aria-hidden="true"><span>You</span><span>Your wife</span></div>
+          <div class="pair"><span class="pair-label">To RRSP</span>
+            <div class="control"><span class="affix">$</span><input id="a-c-rrsp" aria-label="To RRSP, you" type="number" inputmode="numeric" min="0" step="500"></div>
+            <div class="control"><span class="affix">$</span><input id="b-c-rrsp" aria-label="To RRSP, your wife" type="number" inputmode="numeric" min="0" step="500"></div></div>
+          <div class="pair"><span class="pair-label">To TFSA</span>
+            <div class="control"><span class="affix">$</span><input id="a-c-tfsa" aria-label="To TFSA, you" type="number" inputmode="numeric" min="0" step="500"></div>
+            <div class="control"><span class="affix">$</span><input id="b-c-tfsa" aria-label="To TFSA, your wife" type="number" inputmode="numeric" min="0" step="500"></div></div>
+          <div class="field wide"><label for="in-c-nonreg" id="lb-c-nonreg">To joint non-registered</label><div class="control"><span class="affix">$</span><input id="in-c-nonreg" type="number" inputmode="numeric" min="0" step="500"></div></div>
+        </fieldset>
+        <fieldset>
+          <legend>Retirement spending</legend>
+          <div class="field wide"><label for="in-spend" id="lb-spend">Household spending per year, after tax</label><div class="control"><span class="affix">$</span><input id="in-spend" type="number" inputmode="numeric" min="0" step="1000"></div><input id="in-spend-range" type="range" min="30000" max="250000" step="1000" aria-label="Household spending per year, after tax"><p class="hint" id="spend-hint"></p></div>
+        </fieldset>
+        <fieldset>
+          <legend>CPP and OAS</legend>
+          <div class="who" aria-hidden="true"><span>You</span><span>Your wife</span></div>
+          <div class="pair"><span class="pair-label">CPP estimate at 65, per month</span>
+            <div class="control"><span class="affix">$</span><input id="a-cpp" aria-label="CPP estimate at 65, per month, you" type="number" inputmode="numeric" min="0" step="25"></div>
+            <div class="control"><span class="affix">$</span><input id="b-cpp" aria-label="CPP estimate at 65, per month, your wife" type="number" inputmode="numeric" min="0" step="25"></div></div>
+          <p class="hint" id="hint-cpp">Maximum is $1,507.65 each. Your own estimates are in My Service Canada Account.</p>
+          <div class="pair"><span class="pair-label">Start CPP at</span>
+            <div class="control"><select id="a-cpp-age" aria-label="Start CPP at, you"></select></div>
+            <div class="control"><select id="b-cpp-age" aria-label="Start CPP at, your wife"></select></div></div>
+          <div class="pair"><span class="pair-label">Start OAS at</span>
+            <div class="control"><select id="a-oas-age" aria-label="Start OAS at, you"></select></div>
+            <div class="control"><select id="b-oas-age" aria-label="Start OAS at, your wife"></select></div></div>
+          <div class="pair"><span class="pair-label">Years lived in Canada between 18 and 65</span>
+            <div class="control"><input id="a-oas-years" aria-label="Years lived in Canada between 18 and 65, you" type="number" inputmode="numeric" min="10" max="47" step="1"></div>
+            <div class="control"><input id="b-oas-years" aria-label="Years lived in Canada between 18 and 65, your wife" type="number" inputmode="numeric" min="10" max="47" step="1"></div></div>
+          <p class="hint">40 or more gives the full OAS pension.</p>
+        </fieldset>
+        <fieldset>
+          <legend id="lg-db">Workplace pensions</legend>
+          <div class="who" aria-hidden="true"><span>You</span><span>Your wife</span></div>
+          <div class="pair"><span class="pair-label">Per year</span>
+            <div class="control"><span class="affix">$</span><input id="a-db" aria-label="Per year, you" type="number" inputmode="numeric" min="0" step="1000"></div>
+            <div class="control"><span class="affix">$</span><input id="b-db" aria-label="Per year, your wife" type="number" inputmode="numeric" min="0" step="1000"></div></div>
+          <div class="pair"><span class="pair-label">Starting at age</span>
+            <div class="control"><input id="a-db-age" aria-label="Starting at age, you" type="number" inputmode="numeric" min="50" max="75" step="1"></div>
+            <div class="control"><input id="b-db-age" aria-label="Starting at age, your wife" type="number" inputmode="numeric" min="50" max="75" step="1"></div></div>
+          <div class="pair">
+            <label class="check" for="a-db-indexed"><input id="a-db-indexed" type="checkbox"> Rises with inflation</label>
+            <label class="check" for="b-db-indexed"><input id="b-db-indexed" type="checkbox"> Rises with inflation</label></div>
+        </fieldset>
+        <fieldset>
+          <legend>Markets</legend>
+          <div class="field"><label for="in-ret">Expected return</label><div class="control"><input id="in-ret" type="number" inputmode="decimal" min="0" max="12" step="0.1"><span class="affix end">%</span></div></div>
+          <div class="field"><label for="in-infl">Inflation</label><div class="control"><input id="in-infl" type="number" inputmode="decimal" min="0" max="8" step="0.1"><span class="affix end">%</span></div></div>
+          <div class="field wide"><label for="in-vol">Year-to-year swing in returns</label><div class="control"><input id="in-vol" type="number" inputmode="decimal" min="0" max="25" step="0.5"><span class="affix end">%</span></div><p class="hint">About 6% for mostly bonds, 10% for a balanced mix, 15% for all stocks.</p></div>
+        </fieldset>
+        <fieldset>
+          <legend>Withdrawal order</legend>
+          <div class="field wide"><label for="in-strategy">Which account to draw first</label><div class="control"><select id="in-strategy">
+            <option value="taxable">Non-registered, then RRSP, then TFSA</option>
+            <option value="bracket">RRSP up to the lowest tax bracket, then the rest</option>
+            <option value="rrsp">RRSP first, then non-registered, then TFSA</option>
+          </select></div></div>
+        </fieldset>
+        <div class="actions"><button type="button" id="reset">Reset to the example</button></div>
+      </form>
+    </aside>
+
+    <div class="results">
+      <section class="panel">
+        <div class="chart-head">
+          <h2>How your savings could grow and shrink</h2>
+          <p id="fan-sub">Your combined savings each year across 1,000 simulated market paths.</p>
+        </div>
+        <div class="legend" id="fan-legend">
+          <span><i class="line" style="background: var(--accent)"></i>Median path</span>
+          <span><i style="background: var(--accent); opacity: 0.34"></i>Middle half of paths</span>
+          <span><i style="background: var(--accent); opacity: 0.14"></i>8 of 10 paths</span>
+        </div>
+        <div class="plot" id="fan"></div>
+      </section>
+
+      <section class="panel">
+        <div class="chart-head">
+          <h2>Where each year's income comes from</h2>
+          <p id="inc-sub">Household income before tax each year, if returns match your expected rate every year. The part of each bar above the line goes to income tax.</p>
+        </div>
+        <div class="legend" id="inc-legend"></div>
+        <div class="plot" id="inc"></div>
+      </section>
+
+      <section class="panel">
+        <div class="chart-head">
+          <h2>What retiring earlier or later does</h2>
+          <p id="ages-sub">Chance the money lasts if you both shift your retirement by the same number of years, with everything else unchanged.</p>
+        </div>
+        <div class="ages" id="ages"></div>
+      </section>
+
+      <section class="panel">
+        <div class="chart-head">
+          <h2>Year by year</h2>
+          <p id="ledger-sub">The same steady-return path as the income chart, from the year you have both retired. Savings are at the start of each year.</p>
+        </div>
+        <div class="table-scroll" tabindex="0">
+          <table>
+            <thead><tr id="ledger-head"></tr></thead>
+            <tbody id="ledger"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel notes">
+        <details>
+          <summary>What this simulator assumes</summary>
+          <ul>
+            <li>Everyone lives in Ontario. A joint scenario taxes each spouse on their own income; an individual scenario models one person on their own, with all of the non-registered savings and its own spending figure. Tax uses the 2026 federal and Ontario brackets, the basic, age and pension income credits, the Ontario surtax and health premium, and the OAS recovery tax on income above $95,323. Brackets are assumed to keep pace with inflation.</li>
+            <li>Each simulated year draws a return at random around your expected return, using the swing you set. All accounts earn the same return.</li>
+            <li>In a joint scenario, pension income splitting is applied whenever it lowers your combined tax: up to half of workplace pension income at any age, and of RRSP or RRIF income from 65, moves to the lower-income spouse. RRSP withdrawals are drawn from whichever of you has the lower income first.</li>
+            <li>In a joint scenario, savings are drawn from the year you have both retired. Before that, the model assumes the spouse still working covers your spending, and it ignores any CPP, OAS or pension the retired spouse receives.</li>
+            <li>CPP is reduced 0.6% for each month it starts before 65 and raised 0.7% for each month after. OAS is $762.50 a month at 65 (October to December 2026), rises 0.6% for each month deferred, and rises 10% at 75.</li>
+            <li>RRIF minimum withdrawals start at 71 using the CRA percentages. Cash you are forced to withdraw but don't need goes to your TFSAs (up to $7,000 a year each), then to non-registered savings.</li>
+            <li>Non-registered growth is taxed as a capital gain when you sell, at 50% inclusion. The cost base starts at today's balance, and gains are split equally between you.</li>
+            <li>Not included: what happens in a joint scenario after one of you dies (survivor benefits, and tax on one income), CPP sharing, spousal RRSPs, the Guaranteed Income Supplement, the Ontario low-income tax reduction, contribution room limits, investment fees, home equity, and tax on what you leave behind.</li>
+          </ul>
+          <p>Figures come from the <a href="https://www.canada.ca/en/services/benefits/publicpensions/cpp.html" target="_blank" rel="noopener">Government of Canada CPP page</a> and TaxTips.ca tables for <a href="https://www.taxtips.ca/taxrates/on.htm" target="_blank" rel="noopener">Ontario tax rates</a> and <a href="https://www.taxtips.ca/nrcredits/tax-credits-2026.htm" target="_blank" rel="noopener">2026 tax credits</a>. This is a planning estimate and is no substitute for advice from a financial planner.</p>
+        </details>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Retirement engine: 2026 federal + Ontario tax, CPP/OAS rules, RRIF minimums.
+   Everything is in today's dollars (returns are converted to real returns). */
+const Engine = (() => {
+  const F = {
+    brackets: [[58523, 0.14], [117045, 0.205], [181440, 0.26], [258482, 0.29], [Infinity, 0.33]],
+    rate: 0.14, bpaMax: 16452, bpaMin: 14829, bpaStart: 181440, bpaEnd: 258482,
+    age: 9208, ageThresh: 46432, pension: 2000
+  };
+  const O = {
+    brackets: [[53891, 0.0505], [107785, 0.0915], [150000, 0.1116], [220000, 0.1216], [Infinity, 0.1316]],
+    rate: 0.0505, bpa: 12989, age: 6342, ageThresh: 47210, pension: 1796,
+    surtax1: 5818, surtax2: 7446
+  };
+  const OAS_THRESHOLD = 95323;      // 2026 income, recovery tax starts
+  const OAS_MONTHLY = 762.50;       // Oct-Dec 2026, age 65-74, full pension
+  const CPP_MAX_MONTHLY = 1507.65;  // 2026 maximum at 65
+  const TFSA_LIMIT = 7000;
+  const RRIF = { 71: 0.0528, 72: 0.0540, 73: 0.0553, 74: 0.0567, 75: 0.0582, 76: 0.0598, 77: 0.0617,
+    78: 0.0636, 79: 0.0658, 80: 0.0682, 81: 0.0708, 82: 0.0738, 83: 0.0771, 84: 0.0808, 85: 0.0851,
+    86: 0.0899, 87: 0.0955, 88: 0.1021, 89: 0.1099, 90: 0.1192, 91: 0.1306, 92: 0.1449, 93: 0.1634, 94: 0.1879 };
+  const rrifFactor = age => age < 71 ? 0 : age >= 95 ? 0.20 : RRIF[age];
+
+  function bracketTax(income, brackets) {
+    let tax = 0, lower = 0;
+    for (let i = 0; i < brackets.length; i++) {
+      const upper = brackets[i][0];
+      if (income <= lower) break;
+      tax += (Math.min(income, upper) - lower) * brackets[i][1];
+      lower = upper;
+    }
+    return tax;
+  }
+
+  function healthPremium(ti) {
+    if (ti <= 20000) return 0;
+    if (ti <= 36000) return Math.min(300, 0.06 * (ti - 20000));
+    if (ti <= 48000) return Math.min(450, 300 + 0.06 * (ti - 36000));
+    if (ti <= 72000) return Math.min(600, 450 + 0.25 * (ti - 48000));
+    if (ti <= 200000) return Math.min(750, 600 + 0.25 * (ti - 72000));
+    return Math.min(900, 750 + 0.25 * (ti - 200000));
+  }
+
+  /* ordinary: fully taxable income other than OAS. gains: realized capital gains (50% included).
+     pensionElig: income that qualifies for the pension income credit. Returns total tax incl. OAS clawback. */
+  function tax(ordinary, oas, gains, age, pensionElig) {
+    const net0 = ordinary + oas + 0.5 * gains;
+    const claw = oas > 0 ? Math.min(oas, Math.max(0, 0.15 * (net0 - OAS_THRESHOLD))) : 0;
+    const ti = net0 - claw;
+    if (ti <= 0) return 0;
+    let bpa = F.bpaMax;
+    if (ti > F.bpaStart) bpa = Math.max(F.bpaMin, F.bpaMax - (F.bpaMax - F.bpaMin) * (ti - F.bpaStart) / (F.bpaEnd - F.bpaStart));
+    let fc = bpa + Math.min(F.pension, pensionElig);
+    let oc = O.bpa + Math.min(O.pension, pensionElig);
+    if (age >= 65) {
+      fc += Math.max(0, F.age - 0.15 * Math.max(0, ti - F.ageThresh));
+      oc += Math.max(0, O.age - 0.15 * Math.max(0, ti - O.ageThresh));
+    }
+    const fed = Math.max(0, bracketTax(ti, F.brackets) - F.rate * fc);
+    const onBase = Math.max(0, bracketTax(ti, O.brackets) - O.rate * oc);
+    const on = onBase + 0.20 * Math.max(0, onBase - O.surtax1) + 0.36 * Math.max(0, onBase - O.surtax2) + healthPremium(ti);
+    return fed + on + claw;
+  }
+
+  function cppAnnual(p) {
+    const months = (p.cppAge - 65) * 12;
+    const adj = months < 0 ? 1 + 0.006 * months : 1 + 0.007 * months;
+    return p.cpp65 * 12 * adj;
+  }
+  function oasAnnual(p, age) {
+    const base = OAS_MONTHLY * 12 * Math.min(1, p.oasYears / 40) * (1 + 0.006 * 12 * (p.oasAge - 65));
+    return age >= 75 ? base * 1.10 : base;
+  }
+
+  /* One household path. With p.single set, people[1] is an empty placeholder and all income is taxed on people[0].
+     Otherwise this is a couple. realReturn(i) gives the real return for year index i.
+     Savings are drawn from the first year both people are retired. TFSAs are pooled (no tax attributes);
+     RRSPs stay separate because RRIF minimums and tax are per person.
+     Returns the first year index at which spending could not be met, or -1 if fully funded. */
+  function run(p, realReturn, totals, rows) {
+    const A = p.people[0], B = p.people[1];
+    let rA = A.rrsp, rB = B.rrsp, tfsa = A.tfsa + B.tfsa, nonreg = p.nonreg, acb = p.nonreg;
+    const infl = 1 + p.inflation;
+    const cppA0 = cppAnnual(A), cppB0 = cppAnnual(B);
+    const years = p.endAge - Math.min(A.age, B.age) + 1;
+    const drawStart = drawStartIndex(p);
+    let failedAt = -1;
+    let dR = 0, dA = 0, dB = 0, aN = 0, aT = 0, tA = 0, tB = 0;   // scratch set by alloc() and taxes()
+
+    for (let i = 0; i < years; i++) {
+      const ageA = A.age + i, ageB = B.age + i;
+      const r = realReturn(i);
+      const startTotal = rA + rB + tfsa + nonreg;
+      if (totals) totals[i] = startTotal;
+
+      if (i < drawStart) {
+        const wA = ageA < A.retireAge, wB = ageB < B.retireAge;
+        if (rows) rows.push({ i, ageA, ageB, phase: 'saving', start: startTotal });
+        rA = rA * (1 + r) + (wA ? A.cRrsp : 0);
+        rB = rB * (1 + r) + (wB ? B.cRrsp : 0);
+        tfsa = tfsa * (1 + r) + (wA ? A.cTfsa : 0) + (wB ? B.cTfsa : 0);
+        nonreg = nonreg * (1 + r) + p.cNonreg;
+        acb = acb / infl + p.cNonreg;
+        continue;
+      }
+
+      const cppA = ageA >= A.cppAge ? cppA0 : 0, cppB = ageB >= B.cppAge ? cppB0 : 0;
+      const oasA = ageA >= A.oasAge ? oasAnnual(A, ageA) : 0, oasB = ageB >= B.oasAge ? oasAnnual(B, ageB) : 0;
+      const dbA = A.dbAmount > 0 && ageA >= A.dbAge ? (A.dbIndexed ? A.dbAmount : A.dbAmount / Math.pow(infl, ageA - A.dbAge)) : 0;
+      const dbB = B.dbAmount > 0 && ageB >= B.dbAge ? (B.dbIndexed ? B.dbAmount : B.dbAmount / Math.pow(infl, ageB - B.dbAge)) : 0;
+      const minA = rA * rrifFactor(ageA), minB = rB * rrifFactor(ageB);
+      const availA = rA - minA, availB = rB - minB, availR = availA + availB;
+      const baseA = cppA + dbA + minA, baseB = cppB + dbB + minB;
+      const nA0 = baseA + oasA, nB0 = baseB + oasB;
+      const gainFrac = nonreg > 0 ? Math.max(0, 1 - acb / nonreg) : 0;
+      const target = p.spending;
+      const firstCap = p.strategy !== 'bracket' ? Infinity : p.single ? Math.max(0, O.brackets[0][0] - nA0) : Math.max(0, 2 * O.brackets[0][0] - nA0 - nB0);
+
+      const alloc = x => {
+        let left = x; dR = 0; aN = 0; aT = 0;
+        if (p.strategy !== 'taxable') { dR = Math.min(left, availR, firstCap); left -= dR; }
+        aN = Math.min(left, nonreg); left -= aN;
+        if (p.strategy === 'taxable') { const d = Math.min(left, availR); dR += d; left -= d; }
+        aT = Math.min(left, tfsa); left -= aT;
+        if (left > 0) dR += Math.min(left, availR - dR);
+        // split the RRSP draw so the two taxable incomes end up as close as the balances allow
+        dA = 0; dB = 0;
+        if (p.single) { dA = dR; return; }
+        const diff = nA0 - nB0;
+        if (diff >= 0) dB = Math.min(dR, diff, availB); else dA = Math.min(dR, -diff, availA);
+        const rest = dR - dA - dB;
+        let ha = Math.min(availA - dA, rest / 2);
+        const hb = Math.min(availB - dB, rest - ha);
+        ha = Math.min(availA - dA, rest - hb);
+        dA += ha; dB += hb;
+      };
+      const taxes = () => {
+        if (p.single) { tA = tax(baseA + dA, oasA, aN * gainFrac, ageA, dbA + (ageA >= 65 ? minA + dA : 0)); tB = 0; return tA; }
+        const g = aN * gainFrac / 2;
+        const ordA = baseA + dA, ordB = baseB + dB;
+        const eligA = dbA + (ageA >= 65 ? minA + dA : 0), eligB = dbB + (ageB >= 65 ? minB + dB : 0);
+        const a0 = tax(ordA, oasA, g, ageA, eligA), b0 = tax(ordB, oasB, g, ageB, eligB);
+        // pension income splitting: move up to half of eligible pension income to even out the two incomes
+        const s = Math.max(-0.5 * eligB, Math.min(0.5 * eligA, (ordA + oasA - ordB - oasB) / 2));
+        if (Math.abs(s) > 1) {
+          const pA = eligA - Math.max(s, 0) + (s < 0 && ageA >= 65 ? -s : 0);
+          const pB = eligB - Math.max(-s, 0) + (s > 0 && ageB >= 65 ? s : 0);
+          const a1 = tax(ordA - s, oasA, g, ageA, pA), b1 = tax(ordB + s, oasB, g, ageB, pB);
+          if (a1 + b1 < a0 + b0) { tA = a1; tB = b1; return a1 + b1; }
+        }
+        tA = a0; tB = b0; return a0 + b0;
+      };
+      const cashIn = nA0 + nB0;
+
+      const maxDraw = availR + nonreg + tfsa;
+      let t, net;
+      alloc(0); t = taxes(); net = cashIn - t;
+      if (net < target) {
+        alloc(maxDraw); t = taxes(); net = cashIn + maxDraw - t;
+        if (net < target) {
+          if (net < target * 0.995 && failedAt < 0) failedAt = i;
+        } else {
+          let lo = 0, hi = maxDraw;
+          for (let k = 0; k < 26 && hi - lo > 1; k++) {
+            const mid = (lo + hi) / 2;
+            alloc(mid);
+            if (cashIn + mid - taxes() < target) lo = mid; else hi = mid;
+          }
+          alloc(hi); t = taxes(); net = cashIn + hi - t;
+        }
+      }
+
+      const surplus = Math.max(0, net - target);
+      if (rows) rows.push({ i, ageA, ageB, phase: 'retired', start: startTotal, cpp: cppA + cppB, oas: oasA + oasB, db: dbA + dbB,
+        wR: minA + minB + dR, wN: aN, wT: aT, tax: t, taxA: tA, taxB: tB, net: Math.min(net, target), target, surplus });
+
+      rA -= minA + dA; rB -= minB + dB;
+      if (aN > 0) { acb -= acb * (aN / nonreg); nonreg -= aN; }
+      tfsa -= aT;
+      if (surplus > 0) {
+        const toTfsa = Math.min(surplus, (p.single ? 1 : 2) * TFSA_LIMIT);
+        tfsa += toTfsa; nonreg += surplus - toTfsa; acb += surplus - toTfsa;
+      }
+      rA = Math.max(0, rA) * (1 + r); rB = Math.max(0, rB) * (1 + r);
+      tfsa = Math.max(0, tfsa) * (1 + r);
+      nonreg = Math.max(0, nonreg) * (1 + r);
+      acb = acb / infl;
+    }
+    return failedAt;
+  }
+  const drawStartIndex = p => Math.max(0, p.people[0].retireAge - p.people[0].age, p.people[1].retireAge - p.people[1].age);
+  const yearCount = p => p.endAge - Math.min(p.people[0].age, p.people[1].age) + 1;
+
+  /* Seeded normal draws, shared across scenarios so that changing an input compares like with like. */
+  let cache = null;
+  function shocks(paths, years) {
+    if (cache && cache.paths >= paths && cache.years >= years) return cache;
+    let s = 0x2F6E2B1;
+    const rnd = () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const z = new Float64Array(paths * years);
+    for (let i = 0; i < z.length; i += 2) {
+      const u = Math.max(rnd(), 1e-12), v = rnd();
+      const m = Math.sqrt(-2 * Math.log(u));
+      z[i] = m * Math.cos(2 * Math.PI * v);
+      if (i + 1 < z.length) z[i + 1] = m * Math.sin(2 * Math.PI * v);
+    }
+    cache = { paths, years, z };
+    return cache;
+  }
+
+  const realRate = p => (1 + p.ret) / (1 + p.inflation) - 1;
+
+  function deterministic(p) {
+    const rows = [];
+    const rr = realRate(p);
+    const failedAt = run(p, () => rr, null, rows);
+    return { rows, failedAt };
+  }
+
+  function monteCarlo(p, paths, wantBands) {
+    const years = yearCount(p);
+    const maxYears = 120;
+    const sh = shocks(Math.max(paths, 1000), maxYears);
+    const totals = wantBands ? new Float64Array(years) : null;
+    const all = wantBands ? Array.from({ length: years }, () => new Float64Array(paths)) : null;
+    let ok = 0; const failAges = [];
+    for (let k = 0; k < paths; k++) {
+      const off = k * sh.years;
+      const f = run(p, i => {
+        const nominal = Math.max(-0.6, p.ret + p.vol * sh.z[off + i]);
+        return (1 + nominal) / (1 + p.inflation) - 1;
+      }, totals, null);
+      if (f >= 0) failAges.push(f); else ok++;
+      if (wantBands) for (let i = 0; i < years; i++) all[i][k] = totals[i];
+    }
+    const out = { success: ok / paths, failAges };
+    if (wantBands) {
+      const q = [0.10, 0.25, 0.50, 0.75, 0.90];
+      out.bands = q.map(() => new Float64Array(years));
+      for (let i = 0; i < years; i++) {
+        const s = all[i].sort();
+        q.forEach((qq, j) => { out.bands[j][i] = s[Math.min(paths - 1, Math.floor(qq * paths))]; });
+      }
+      failAges.sort((a, b) => a - b);
+      out.medianFailIndex = failAges.length ? failAges[Math.floor(failAges.length / 2)] : -1;
+    }
+    return out;
+  }
+
+  /* Largest after-tax spending that is funded in at least `confidence` of paths. */
+  function sustainableSpending(p, paths, confidence) {
+    let lo = 0, hi = 600000;
+    for (let k = 0; k < 11; k++) {
+      const mid = (lo + hi) / 2;
+      const s = monteCarlo(Object.assign({}, p, { spending: mid }), paths, false).success;
+      if (s >= confidence) lo = mid; else hi = mid;
+    }
+    return Math.floor(lo / 500) * 500;
+  }
+
+  return { tax, healthPremium, rrifFactor, cppAnnual, oasAnnual, run, deterministic, monteCarlo,
+    sustainableSpending, realRate, drawStartIndex, yearCount, CPP_MAX_MONTHLY, OAS_MONTHLY, OAS_THRESHOLD };
+})();
+
+</script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const PATHS = 1000, SIDE_PATHS = 300, Y0 = new Date().getFullYear();
+  const PERSON_A = { age: 45, retire: 63, rrsp: 250000, tfsa: 90000, cRrsp: 12000, cTfsa: 7000, cpp: 1100, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
+  const PERSON_B = { age: 43, retire: 61, rrsp: 180000, tfsa: 70000, cRrsp: 8000, cTfsa: 5000, cpp: 850, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
+  const EXAMPLE = { mode: 'joint', a: PERSON_A, b: PERSON_B, end: 95, nonreg: 40000, cNonreg: 0, spend: 85000, ret: 5.5, infl: 2.1, vol: 10, strategy: 'taxable' };
+  const PF = { age: 'age', retire: 'retire', rrsp: 'rrsp', tfsa: 'tfsa', cRrsp: 'c-rrsp', cTfsa: 'c-tfsa', cpp: 'cpp', cppAge: 'cpp-age', oasAge: 'oas-age', oasYears: 'oas-years', db: 'db', dbAge: 'db-age' };
+  const SF = { end: 'in-end', nonreg: 'in-nonreg', cNonreg: 'in-c-nonreg', spend: 'in-spend', ret: 'in-ret', infl: 'in-infl', vol: 'in-vol' };
+  const SERIES = [
+    { key: 'cpp', label: 'CPP', color: 'var(--s-cpp)' },
+    { key: 'oas', label: 'OAS', color: 'var(--s-oas)' },
+    { key: 'db', label: 'Workplace pensions', color: 'var(--s-db)' },
+    { key: 'wR', label: 'RRSP / RRIF', color: 'var(--s-rrsp)' },
+    { key: 'wN', label: 'Non-registered', color: 'var(--s-nonreg)' },
+    { key: 'wT', label: 'TFSA', color: 'var(--s-tfsa)' }
+  ];
+  const STORE = 'retirement-income-simulator-couple-v1';
+
+  const money = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0, currencyDisplay: 'narrowSymbol' });
+  const fmt = v => money.format(Math.round(v));
+  const compact = v => v >= 1e6 ? '$' + (v / 1e6).toFixed(v >= 1e7 ? 0 : 2).replace(/\.?0+$/, '') + 'M' : v >= 1000 ? '$' + Math.round(v / 1000) + 'K' : '$' + Math.round(v);
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const clone = v => JSON.parse(JSON.stringify(v));
+
+  for (const who of ['a', 'b']) for (const key of ['cpp-age', 'oas-age']) {
+    const from = key === 'cpp-age' ? 60 : 65;
+    for (let a = from; a <= 70; a++) $(who + '-' + key).appendChild(new Option('Age ' + a, a));
+  }
+
+  function fill(v) {
+    for (const who of ['a', 'b']) {
+      for (const k in PF) $(who + '-' + PF[k]).value = v[who][k];
+      $(who + '-db-indexed').checked = !!v[who].dbIndexed;
+    }
+    for (const k in SF) $(SF[k]).value = v[k];
+    $('in-strategy').value = v.strategy;
+    $('in-spend-range').value = v.spend;
+    $('mode-' + v.mode).checked = true;
+  }
+  let last = clone(EXAMPLE);
+  function read() {
+    const v = { a: {}, b: {} };
+    v.mode = $('mode-a').checked ? 'a' : $('mode-b').checked ? 'b' : 'joint';
+    const num = (id, fallback) => { const n = parseFloat($(id).value); return Number.isFinite(n) ? n : fallback; };
+    for (const who of ['a', 'b']) {
+      const q = v[who];
+      for (const k in PF) q[k] = num(who + '-' + PF[k], last[who][k]);
+      q.dbIndexed = $(who + '-db-indexed').checked;
+      q.age = clamp(Math.round(q.age), 18, 90);
+      q.retire = clamp(Math.round(q.retire), q.age, Math.max(q.age, 75));
+      for (const k of ['rrsp', 'tfsa', 'cRrsp', 'cTfsa', 'db']) q[k] = Math.max(0, q[k]);
+      q.cpp = clamp(q.cpp, 0, Engine.CPP_MAX_MONTHLY);
+      q.oasYears = clamp(q.oasYears, 0, 47);
+      q.dbAge = clamp(Math.round(q.dbAge), 50, 75);
+    }
+    for (const k in SF) v[k] = num(SF[k], last[k]);
+    v.strategy = $('in-strategy').value;
+    const inPlan = v.mode === 'joint' ? [v.a, v.b] : [v[v.mode]];
+    const young = Math.min(...inPlan.map(q => q.age)), gap = Math.max(...inPlan.map(q => q.retire - q.age));
+    v.end = clamp(Math.round(v.end), Math.max(young + gap + 1, 70), 110);
+    for (const k of ['nonreg', 'cNonreg', 'spend']) v[k] = Math.max(0, v[k]);
+    v.ret = clamp(v.ret, 0, 12); v.infl = clamp(v.infl, 0, 8); v.vol = clamp(v.vol, 0, 25);
+    last = v;
+    return v;
+  }
+  const person = q => ({ age: q.age, retireAge: q.retire, rrsp: q.rrsp, tfsa: q.tfsa, cRrsp: q.cRrsp, cTfsa: q.cTfsa, cpp65: q.cpp,
+    cppAge: q.cppAge, oasAge: q.oasAge, oasYears: q.oasYears, dbAmount: q.db, dbAge: q.dbAge, dbIndexed: q.dbIndexed });
+  const empty = q => Object.assign({}, q, { rrsp: 0, tfsa: 0, cRrsp: 0, cTfsa: 0, cpp65: 0, oasYears: 0, dbAmount: 0 });
+  const people = v => { if (v.mode === 'joint') return [person(v.a), person(v.b)]; const q = person(v[v.mode]); return [q, empty(q)]; };
+  const toParams = v => ({ people: people(v), single: v.mode !== 'joint', nonreg: v.nonreg, cNonreg: v.cNonreg, endAge: v.end, spending: v.spend,
+    ret: v.ret / 100, vol: v.vol / 100, inflation: v.infl / 100, strategy: v.strategy });
+  const ages = (p, i) => p.single ? `age ${p.people[0].age + i}` : `ages ${p.people[0].age + i} and ${p.people[1].age + i}`;
+  let mode = 'joint';
+  const SPEND = { joint: 85000, a: 50000, b: 38000 };   // each scenario keeps its own spending figure
+  let spendBy = Object.assign({}, SPEND);
+  const COPY = {
+    joint: { people: 'The two of you', end: 'Plan until the younger of you is', nonreg: 'Joint non-registered investments', cNonreg: 'To joint non-registered',
+      spend: 'Household spending per year, after tax', cpp: 'Maximum is $1,507.65 each. Your own estimates are in My Service Canada Account.', db: 'Workplace pensions',
+      stRet: 'Median savings when you have both retired', fan: 'Your combined savings each year across 1,000 simulated market paths.',
+      inc: 'Household income before tax each year, if returns match your expected rate every year. The part of each bar above the line goes to income tax.',
+      shift: 'Chance the money lasts if you both shift your retirement by the same number of years, with everything else unchanged.',
+      ledger: 'The same steady-return path as the income chart, from the year you have both retired. Savings are at the start of each year.', month: ' a month for the two of you' },
+    a: { people: 'You', end: 'Plan to age', nonreg: 'Non-registered investments', cNonreg: 'To non-registered',
+      spend: 'Spending per year, after tax', cpp: 'Maximum is $1,507.65. Your own estimate is in My Service Canada Account.', db: 'Workplace pension',
+      stRet: 'Median savings at retirement', fan: 'Your savings each year across 1,000 simulated market paths.',
+      inc: 'Income before tax each year, if returns match your expected rate every year. The part of each bar above the line goes to income tax.',
+      shift: 'Chance the money lasts if you retire earlier or later, with everything else unchanged.',
+      ledger: 'The same steady-return path as the income chart, from the year you retire. Savings are at the start of each year.', month: ' a month' }
+  };
+  COPY.b = Object.assign({}, COPY.a, { people: 'Your wife', cpp: 'Maximum is $1,507.65. Her own estimate is in My Service Canada Account.',
+    fan: 'Her savings each year across 1,000 simulated market paths.', shift: 'Chance the money lasts if she retires earlier or later, with everything else unchanged.',
+    ledger: 'The same steady-return path as the income chart, from the year she retires. Savings are at the start of each year.' });
+  function applyMode(m) {
+    mode = m; $('form').dataset.mode = m;
+    const c = COPY[m];
+    $('lg-people').textContent = c.people; $('lb-end').textContent = c.end; $('lb-nonreg').textContent = c.nonreg; $('lb-c-nonreg').textContent = c.cNonreg;
+    $('lb-spend').textContent = c.spend; $('hint-cpp').textContent = c.cpp; $('lg-db').textContent = c.db; $('st-ret-label').textContent = c.stRet;
+    $('fan-sub').textContent = c.fan; $('inc-sub').textContent = c.inc; $('ages-sub').textContent = c.shift; $('ledger-sub').textContent = c.ledger;
+  }
+  for (const node of document.querySelectorAll('#form input, #form select')) {
+    if (/^[ab]-/.test(node.id)) (node.closest('.check') || node.closest('.control')).dataset.who = node.id[0];
+  }
+
+  /* ---------- charts ---------- */
+  function niceTicks(max, n) {
+    const raw = Math.max(max, 1) / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), norm = raw / mag;
+    const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+    const ticks = [];
+    for (let v = 0; v < max + step - 1e-6; v += step) ticks.push(v);
+    return ticks;
+  }
+  function frame(host, yMax, n, firstYear, bands) {
+    const W = Math.max(280, host.clientWidth), H = W < 480 ? 250 : 310;
+    const m = { l: 50, r: 14, t: 24, b: 26 };
+    const ticks = niceTicks(yMax, 4), top = ticks[ticks.length - 1];
+    const pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const x = bands ? i => m.l + (i + 0.5) * pw / n : i => m.l + i / Math.max(1, n - 1) * pw;
+    const y = v => m.t + ph - v / top * ph;
+    let s = '';
+    for (const t of ticks) {
+      s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}" stroke="${t === 0 ? 'var(--line-strong)' : 'var(--line)'}" stroke-width="1"/>`;
+      s += `<text x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${compact(t)}</text>`;
+    }
+    const every = n / (W / 70) > 5 ? 10 : 5;
+    for (let i = 0; i < n; i++) if ((firstYear + i) % every === 0) s += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${firstYear + i}</text>`;
+    return { W, H, m, pw, ph, x, y, top, grid: s };
+  }
+  function showTip(host, tip, px, build) {
+    tip.replaceChildren(); build(tip); tip.hidden = false;
+    const w = tip.offsetWidth, hw = host.clientWidth;
+    const left = px + 14 + w > hw ? Math.max(0, px - 14 - w) : px + 14;
+    tip.style.transform = `translate(${left}px, 8px)`;
+  }
+  const tipRow = (tip, label, value, color) => {
+    const r = el('div', 'row'), s = el('span');
+    if (color) { const i = el('i'); i.style.background = color; s.appendChild(i); }
+    s.appendChild(document.createTextNode(label));
+    r.append(s, el('b', null, value)); tip.appendChild(r);
+  };
+
+  function drawFan(p, mc) {
+    const host = $('fan'), b = mc.bands, n = b[0].length;
+    let yMax = 0; for (let i = 0; i < n; i++) yMax = Math.max(yMax, b[4][i]);
+    const f = frame(host, yMax, n, Y0, false);
+    const pts = (arr, rev) => { const o = []; for (let i = 0; i < n; i++) { const j = rev ? n - 1 - i : i; o.push(f.x(j).toFixed(1) + ',' + f.y(arr[j]).toFixed(1)); } return o.join(' '); };
+    const ri = Engine.drawStartIndex(p), rx = f.x(ri), ry = f.y(b[2][ri]);
+    let s = `<svg viewBox="0 0 ${f.W} ${f.H}" height="${f.H}" role="img" aria-label="Savings by year: median path with the range of simulated outcomes">` + f.grid;
+    s += `<polygon points="${pts(b[4])} ${pts(b[0], true)}" fill="var(--accent)" fill-opacity="0.14"/>`;
+    s += `<polygon points="${pts(b[3])} ${pts(b[1], true)}" fill="var(--accent)" fill-opacity="0.22"/>`;
+    s += `<polyline points="${pts(b[2])}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    s += `<line x1="${rx}" x2="${rx}" y1="${f.m.t - 6}" y2="${f.m.t + f.ph}" stroke="var(--ink-2)" stroke-width="1"/>`;
+    const anchor = rx > f.W - 130 ? 'end' : rx < 130 ? 'start' : 'middle';
+    s += `<text class="strong" x="${rx}" y="${f.m.t - 10}" text-anchor="${anchor}">${ri === 0 ? 'Retired' : p.single ? 'Retire at ' + p.people[0].retireAge : 'Both retired, ' + (Y0 + ri)}</text>`;
+    s += `<circle cx="${rx}" cy="${ry}" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>`;
+    const lblRight = rx < f.W - 90;
+    s += `<text class="strong halo" x="${rx + (lblRight ? 10 : -10)}" y="${ry - 9}" text-anchor="${lblRight ? 'start' : 'end'}">${compact(b[2][ri])}</text>`;
+    s += `<line id="fan-cross" x1="0" x2="0" y1="${f.m.t}" y2="${f.m.t + f.ph}" stroke="var(--ink)" stroke-width="1" visibility="hidden"/>`;
+    s += `<rect id="fan-hit" x="${f.m.l}" y="${f.m.t}" width="${f.pw}" height="${f.ph}" fill="transparent"/></svg>`;
+    host.innerHTML = s;
+    const tip = el('div', 'tip'); tip.hidden = true; host.appendChild(tip);
+    const cross = host.querySelector('#fan-cross'), hit = host.querySelector('#fan-hit');
+    const move = e => {
+      const r = host.getBoundingClientRect(), px = e.clientX - r.left;
+      const i = clamp(Math.round((px - f.m.l) / f.pw * (n - 1)), 0, n - 1), cx = f.x(i);
+      cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.setAttribute('visibility', 'visible');
+      showTip(host, tip, cx, t => {
+        t.appendChild(el('h3', null, `${Y0 + i}, ${ages(p, i)}`));
+        tipRow(t, 'Best 1 in 10', fmt(b[4][i]));
+        tipRow(t, 'Better than 3 in 4', fmt(b[3][i]));
+        tipRow(t, 'Median', fmt(b[2][i]), 'var(--accent)');
+        tipRow(t, 'Worse than 3 in 4', fmt(b[1][i]));
+        tipRow(t, 'Worst 1 in 10', fmt(b[0][i]));
+      });
+    };
+    hit.addEventListener('pointermove', move); hit.addEventListener('pointerdown', move);
+    hit.addEventListener('pointerleave', () => { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); });
+  }
+
+  function drawIncome(p, rows) {
+    const host = $('inc'), data = rows.filter(r => r.phase === 'retired');
+    const used = SERIES.filter(sr => data.some(r => r[sr.key] > 0.5));
+    const lg = $('inc-legend'); lg.replaceChildren();
+    for (const sr of used) { const sp = el('span'), i = el('i'); i.style.background = sr.color; sp.append(i, document.createTextNode(sr.label)); lg.appendChild(sp); }
+    const gross = r => r.cpp + r.oas + r.db + r.wR + r.wN + r.wT;
+    const yMax = Math.max(p.spending, ...data.map(gross)) * 1.04;
+    const n = data.length;
+    const f = frame(host, yMax, n, Y0 + data[0].i, true);
+    const slot = f.pw / n, bw = Math.max(2, Math.min(24, slot - 2)), rad = Math.min(4, bw / 2), base = f.m.t + f.ph;
+    let s = `<svg viewBox="0 0 ${f.W} ${f.H}" height="${f.H}" role="img" aria-label="Income by source for each year of retirement">` + f.grid;
+    s += `<rect id="inc-band" x="0" y="${f.m.t}" width="${slot}" height="${f.ph}" fill="var(--ink)" fill-opacity="0.07" visibility="hidden"/>`;
+    data.forEach((r, idx) => {
+      const cx = f.x(idx), x0 = cx - bw / 2;
+      const segs = used.filter(sr => r[sr.key] > 0.5);
+      let acc = 0;
+      segs.forEach((sr, k) => {
+        const yb = f.y(acc); acc += r[sr.key]; const yt = f.y(acc), isTop = k === segs.length - 1;
+        const h = yb - yt, gap = !isTop && h > 3 ? 2 : 0;
+        if (isTop && h > rad) s += `<path d="M${x0},${yb} V${yt + rad} Q${x0},${yt} ${x0 + rad},${yt} H${x0 + bw - rad} Q${x0 + bw},${yt} ${x0 + bw},${yt + rad} V${yb} Z" fill="${sr.color}"/>`;
+        else s += `<rect x="${x0}" y="${yt + gap}" width="${bw}" height="${Math.max(0.5, h - gap)}" fill="${sr.color}"/>`;
+      });
+    });
+    const ty = f.y(p.spending);
+    s += `<line x1="${f.m.l}" x2="${f.W - f.m.r}" y1="${ty}" y2="${ty}" stroke="var(--ink)" stroke-width="1.5"/>`;
+    s += `<text class="strong halo" x="${f.W - f.m.r - 2}" y="${ty - 6}" text-anchor="end">After-tax target ${fmt(p.spending)}</text>`;
+    s += `<rect id="inc-hit" x="${f.m.l}" y="${f.m.t}" width="${f.pw}" height="${f.ph}" fill="transparent"/></svg>`;
+    host.innerHTML = s;
+    const tip = el('div', 'tip'); tip.hidden = true; host.appendChild(tip);
+    const band = host.querySelector('#inc-band'), hit = host.querySelector('#inc-hit');
+    const move = e => {
+      const rc = host.getBoundingClientRect(), px = e.clientX - rc.left;
+      const i = clamp(Math.floor((px - f.m.l) / slot), 0, n - 1), r = data[i];
+      band.setAttribute('x', f.m.l + i * slot); band.setAttribute('visibility', 'visible');
+      showTip(host, tip, f.x(i), t => {
+        t.appendChild(el('h3', null, `${Y0 + r.i}, ${ages(p, r.i)}`));
+        for (const sr of used) if (r[sr.key] > 0.5) tipRow(t, sr.label, fmt(r[sr.key]), sr.color);
+        t.appendChild(el('div', 'rule'));
+        if (p.single) tipRow(t, 'Income tax', '−' + fmt(r.tax));
+        else { tipRow(t, 'Your income tax', '−' + fmt(r.taxA)); tipRow(t, "Your wife's income tax", '−' + fmt(r.taxB)); }
+        tipRow(t, 'After tax', fmt(gross(r) - r.tax));
+        if (r.net < r.target * 0.995) tipRow(t, 'Short of target by', fmt(r.target - r.net));
+        else if (r.surplus > 1) tipRow(t, 'Saved again', fmt(r.surplus));
+      });
+    };
+    hit.addEventListener('pointermove', move); hit.addEventListener('pointerdown', move);
+    hit.addEventListener('pointerleave', () => { tip.hidden = true; band.setAttribute('visibility', 'hidden'); });
+  }
+
+  function drawLedger(p, rows) {
+    const data = rows.filter(r => r.phase === 'retired');
+    const short = { cpp: 'CPP', oas: 'OAS', db: 'Pensions', wR: 'RRSP / RRIF', wN: 'Non-reg.', wT: 'TFSA' };
+    const used = SERIES.filter(sr => data.some(r => r[sr.key] > 0.5));
+    const head = $('ledger-head'); head.replaceChildren();
+    for (const h of ['Year', p.single ? 'Age' : 'Ages', 'Savings', ...used.map(sr => short[sr.key]), 'Tax', 'After tax']) head.appendChild(el('th', null, h));
+    const body = $('ledger'); body.replaceChildren();
+    for (const r of data) {
+      const tr = el('tr');
+      const cell = v => tr.appendChild(el('td', v < 0.5 ? 'zero' : null, v < 0.5 ? '–' : fmt(v)));
+      tr.appendChild(el('td', null, String(Y0 + r.i)));
+      tr.appendChild(el('td', null, p.single ? String(r.ageA) : r.ageA + ' and ' + r.ageB));
+      cell(r.start); for (const sr of used) cell(r[sr.key]); cell(r.tax);
+      const isShort = r.net < r.target * 0.995;
+      tr.appendChild(el('td', isShort ? 'short' : null, fmt(r.net) + (isShort ? ' (short)' : '')));
+      body.appendChild(tr);
+    }
+  }
+
+  const ICONS = {
+    good: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="8" fill="var(--good)"/><path d="M4.5 8.2l2.3 2.3 4.7-4.9" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    warn: '<svg viewBox="0 0 16 16"><path d="M8 1l7.5 13.5h-15z" fill="var(--warn)"/><path d="M8 6v4" stroke="#13201b" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="12.2" r="1" fill="#13201b"/></svg>',
+    crit: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="8" fill="var(--crit)"/><path d="M5.2 5.2l5.6 5.6M10.8 5.2l-5.6 5.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>'
+  };
+
+  function drawSummary(p, mc) {
+    const pct = Math.round(mc.success * 100), ok = Math.round(mc.success * PATHS);
+    const level = pct >= 90 ? ['good', 'On track'] : pct >= 75 ? ['warn', 'Borderline'] : ['crit', 'At risk'];
+    $('pill').innerHTML = ICONS[level[0]]; $('pill').appendChild(document.createTextNode(level[1]));
+    const b = mc.bands, n = b[0].length, ri = Engine.drawStartIndex(p);
+    $('odds-num').textContent = pct + '%';
+    const endA = p.people[0].age + n - 1;
+    $('odds-label').textContent = mode === 'a' ? `chance your money lasts until you are ${endA}` : mode === 'b' ? `chance your wife's money lasts until she is ${endA}`
+      : `chance your money lasts until you are ${endA} and your wife is ${p.people[1].age + n - 1}`;
+    let text = `${ok.toLocaleString('en-CA')} of ${PATHS.toLocaleString('en-CA')} simulated market paths paid ${fmt(p.spending)} a year after tax through ${Y0 + n - 1}.`;
+    if (mc.medianFailIndex >= 0) text += ` In the paths that fell short, savings typically ran out around ${Y0 + mc.medianFailIndex}, at ${ages(p, mc.medianFailIndex)}.`;
+    $('odds-text').textContent = text;
+    $('st-ret').textContent = fmt(b[2][ri]);
+    $('st-ret-sub').textContent = ri > 0 ? `${compact(b[0][ri])} to ${compact(b[4][ri])} in 8 of 10 paths, in ${Y0 + ri}` : 'your savings today';
+    $('st-end-label').textContent = 'Median left in ' + (Y0 + n - 1);
+    $('st-end').textContent = fmt(b[2][n - 1]);
+  }
+
+  function drawAges(p, list) {
+    const host = $('ages'); host.replaceChildren();
+    for (const it of list) {
+      const row = el('div', 'age-row' + (it.shift === 0 ? ' current' : ''));
+      const track = el('div', 'track'), fillEl = el('div', 'fill');
+      fillEl.style.width = Math.round(it.success * 100) + '%'; track.appendChild(fillEl);
+      const n = Math.abs(it.shift), label = it.shift === 0 ? 'As planned' : `${n} year${n > 1 ? 's' : ''} ${it.shift < 0 ? 'earlier' : 'later'}`;
+      row.append(el('span', null, label), track, el('b', null, Math.round(it.success * 100) + '%'));
+      host.appendChild(row);
+    }
+  }
+
+  /* ---------- run ---------- */
+  let state = null, job = 0;
+  function recalc() {
+    let v = read();
+    if (v.mode !== mode) {
+      spendBy[mode] = v.spend;
+      $('in-spend').value = spendBy[v.mode]; $('in-spend-range').value = spendBy[v.mode];
+      applyMode(v.mode); v = read();
+    }
+    spendBy[v.mode] = v.spend; v.spendBy = spendBy;
+    const p = toParams(v), mine = ++job;
+    $('spend-hint').textContent = fmt(v.spend / 12) + COPY[v.mode].month;
+    const det = Engine.deterministic(p), mc = Engine.monteCarlo(p, PATHS, true);
+    state = { p, det, mc };
+    drawSummary(p, mc); drawFan(p, mc); drawIncome(p, det.rows); drawLedger(p, det.rows);
+    $('st-safe').classList.add('pending'); $('ages').classList.add('pending');
+    setTimeout(() => {
+      if (mine !== job) return;
+      const safe = Engine.sustainableSpending(p, SIDE_PATHS, 0.9);
+      $('st-safe').textContent = fmt(safe) + ' a year';
+      $('st-safe-sub').textContent = fmt(safe / 12) + ' a month after tax';
+      $('st-safe').classList.remove('pending');
+      const list = [];
+      for (let k = -3; k <= 3; k++) {
+        if (p.people.some(q => q.retireAge + k < q.age || q.retireAge + k > 75)) continue;
+        const shifted = Object.assign({}, p, { people: p.people.map(q => Object.assign({}, q, { retireAge: q.retireAge + k })) });
+        if (Engine.drawStartIndex(shifted) >= Engine.yearCount(shifted)) continue;
+        list.push({ shift: k, success: k === 0 ? mc.success : Engine.monteCarlo(shifted, SIDE_PATHS, false).success });
+      }
+      drawAges(p, list); $('ages').classList.remove('pending');
+    }, 30);
+    try { localStorage.setItem(STORE, JSON.stringify(v)); } catch (e) {}
+  }
+
+  let timer = 0;
+  const schedule = () => { clearTimeout(timer); timer = setTimeout(recalc, 140); };
+  const form = $('form');
+  form.addEventListener('submit', e => e.preventDefault());
+  form.addEventListener('input', e => {
+    const id = e.target.id;
+    if (id === 'in-spend-range') $('in-spend').value = e.target.value;
+    else if (id === 'in-spend') $('in-spend-range').value = e.target.value;
+    $('example-note').hidden = true;
+    schedule();
+  });
+  for (const id of ['mode-joint', 'mode-a', 'mode-b']) $(id).addEventListener('change', recalc);
+  $('reset').addEventListener('click', () => { fill(EXAMPLE); last = clone(EXAMPLE); spendBy = Object.assign({}, SPEND); applyMode('joint'); $('example-note').hidden = false; try { localStorage.removeItem(STORE); } catch (e) {} recalc(); });
+
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) {}
+  if (saved && saved.a && saved.b) { last = Object.assign(clone(EXAMPLE), saved, { mode: COPY[saved.mode] ? saved.mode : 'joint', a: Object.assign({}, PERSON_A, saved.a), b: Object.assign({}, PERSON_B, saved.b) }); spendBy = Object.assign({}, SPEND, saved.spendBy); fill(last); applyMode(last.mode); $('example-note').hidden = true; }
+  else fill(EXAMPLE);
+  recalc();
+
+  let lastW = 0;
+  new ResizeObserver(() => {
+    const w = $('fan').clientWidth;
+    if (!state || Math.abs(w - lastW) < 2) return;
+    lastW = w; drawFan(state.p, state.mc); drawIncome(state.p, state.det.rows);
+  }).observe($('fan'));
+})();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>
