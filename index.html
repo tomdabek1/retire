@@ -154,6 +154,17 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .age-row.current .fill { background: var(--accent); }
 .age-row.current b { font-weight: 600; }
 
+/* Withdrawal order comparison */
+.order-row { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
+.order-row:first-child { border-top: 0; padding-top: 0; }
+.order-row:last-child { padding-bottom: 0; }
+.order-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--ink-2); }
+.order-row.current .order-name { color: var(--ink); font-weight: 600; }
+.tag { font-size: 0.74rem; font-weight: 600; border-radius: 999px; padding: 1px 9px; background: var(--accent); color: var(--on-accent); white-space: nowrap; }
+.tag.alt { background: transparent; color: var(--ink-2); border: 1px solid var(--line-strong); }
+.order-stats { display: flex; flex-wrap: wrap; gap: 2px 22px; font-size: 0.9rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.order-stats b { color: var(--ink); font-weight: 600; }
+
 /* Ledger */
 .table-scroll { overflow: auto; max-height: 440px; border: 1px solid var(--line); border-radius: 6px; }
 table { border-collapse: collapse; width: 100%; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
@@ -297,10 +308,11 @@ details summary { cursor: pointer; font-weight: 600; }
         <fieldset>
           <legend>Withdrawal order</legend>
           <div class="field wide"><label for="in-strategy">Which account to draw first</label><div class="control"><select id="in-strategy">
+            <option value="auto">Automatic: use whichever works best</option>
             <option value="taxable">Non-registered, then RRSP, then TFSA</option>
             <option value="bracket">RRSP up to the lowest tax bracket, then the rest</option>
             <option value="rrsp">RRSP first, then non-registered, then TFSA</option>
-          </select></div></div>
+          </select></div><p class="hint" id="order-hint"></p></div>
         </fieldset>
         <div class="actions"><button type="button" id="reset">Reset to the example</button></div>
       </form>
@@ -340,6 +352,14 @@ details summary { cursor: pointer; font-weight: 600; }
 
       <section class="panel">
         <div class="chart-head">
+          <h2>Which account to draw first</h2>
+          <p>Each withdrawal order tested on the same 1,000 market paths. Automatic picks the best chance of the money lasting, and settles near-ties by what is left after tax: the median amount at the end, after tax on any RRSP still there. The order changes how much tax you pay, not what your investments earn.</p>
+        </div>
+        <div class="orders" id="orders"></div>
+      </section>
+
+      <section class="panel">
+        <div class="chart-head">
           <h2>Year by year</h2>
           <p id="ledger-sub">The same steady-return path as the income chart, from the year you have both retired. Savings are at the start of each year.</p>
         </div>
@@ -360,6 +380,7 @@ details summary { cursor: pointer; font-weight: 600; }
             <li>In a joint scenario, pension income splitting is applied whenever it lowers your combined tax: up to half of workplace pension income at any age, and of RRSP or RRIF income from 65, moves to the lower-income spouse. RRSP withdrawals are drawn from whichever of you has the lower income first.</li>
             <li>In a joint scenario, savings are drawn from the year you have both retired. Before that, the model assumes the spouse still working covers your spending, and it ignores any CPP, OAS or pension the retired spouse receives.</li>
             <li>CPP is reduced 0.6% for each month it starts before 65 and raised 0.7% for each month after. OAS is $762.50 a month at 65 (October to December 2026), rises 0.6% for each month deferred, and rises 10% at 75.</li>
+            <li>Automatic tests the three withdrawal orders on the same 1,000 market paths and uses the one with the best chance your money lasts. Orders within half a percentage point of the best are treated as tied, and the tie goes to the one that leaves the most after tax, counting any RRSP still remaining as taxed all at once in the final year. It only chooses between these three orders, so it is not a full tax plan.</li>
             <li>RRIF minimum withdrawals start at 71 using the CRA percentages. Cash you are forced to withdraw but don't need goes to your TFSAs (up to $7,000 a year each), then to non-registered savings.</li>
             <li>Non-registered growth is taxed as a capital gain when you sell, at 50% inclusion. The cost base starts at today's balance, and gains are split equally between you.</li>
             <li>Rental income is entered after expenses and before income tax. It keeps pace with inflation, is taxed half to each of you in a joint scenario, and is ignored in the years before savings are drawn. Cash from a property sale is entered after commissions and tax and is added to non-registered savings at the start of the sale year. Property values and any mortgage are not modelled.</li>
@@ -451,7 +472,7 @@ const Engine = (() => {
      Savings are drawn from the first year both people are retired. TFSAs are pooled (no tax attributes);
      RRSPs stay separate because RRIF minimums and tax are per person.
      Returns the first year index at which spending could not be met, or -1 if fully funded. */
-  function run(p, realReturn, totals, rows) {
+  function run(p, realReturn, totals, rows, endOut) {
     const A = p.people[0], B = p.people[1];
     let rA = A.rrsp, rB = B.rrsp, tfsa = A.tfsa + B.tfsa, nonreg = p.nonreg, acb = p.nonreg;
     const infl = 1 + p.inflation;
@@ -566,8 +587,12 @@ const Engine = (() => {
       nonreg = Math.max(0, nonreg) * (1 + r);
       acb = acb / infl;
     }
+    if (endOut) { endOut.rrsp = rA + rB; endOut.tfsa = tfsa; endOut.nonreg = nonreg; endOut.gain = Math.max(0, nonreg - acb); }
     return failedAt;
   }
+  /* What the final balances are worth after tax, if any remaining RRSP and unrealized gains
+     all landed on one tax return in the final year. */
+  const afterTax = (e, age) => e.rrsp + e.tfsa + e.nonreg - tax(e.rrsp, 0, e.gain, age, 0);
   const drawStartIndex = p => Math.max(0, p.people[0].retireAge - p.people[0].age, p.people[1].retireAge - p.people[1].age);
   const yearCount = p => p.endAge - Math.min(p.people[0].age, p.people[1].age) + 1;
 
@@ -598,23 +623,26 @@ const Engine = (() => {
     return { rows, failedAt };
   }
 
-  function monteCarlo(p, paths, wantBands) {
+  function monteCarlo(p, paths, wantBands, wantEstate) {
     const years = yearCount(p);
     const maxYears = 120;
     const sh = shocks(Math.max(paths, 1000), maxYears);
     const totals = wantBands ? new Float64Array(years) : null;
     const all = wantBands ? Array.from({ length: years }, () => new Float64Array(paths)) : null;
     let ok = 0; const failAges = [];
+    const endOut = wantEstate ? {} : null, estates = wantEstate ? new Float64Array(paths) : null;
     for (let k = 0; k < paths; k++) {
       const off = k * sh.years;
       const f = run(p, i => {
         const nominal = Math.max(-0.6, p.ret + p.vol * sh.z[off + i]);
         return (1 + nominal) / (1 + p.inflation) - 1;
-      }, totals, null);
+      }, totals, null, endOut);
+      if (wantEstate) estates[k] = afterTax(endOut, p.endAge);
       if (f >= 0) failAges.push(f); else ok++;
       if (wantBands) for (let i = 0; i < years; i++) all[i][k] = totals[i];
     }
     const out = { success: ok / paths, failAges };
+    if (wantEstate) { estates.sort(); out.estate = estates[Math.floor(paths / 2)]; }
     if (wantBands) {
       const q = [0.10, 0.25, 0.50, 0.75, 0.90];
       out.bands = q.map(() => new Float64Array(years));
@@ -628,6 +656,25 @@ const Engine = (() => {
     return out;
   }
 
+  /* Runs every withdrawal order on the same market paths. The best one has the highest chance of the money lasting;
+     orders within half a percentage point of the top are treated as tied, and the tie goes to the one that leaves
+     the most after tax. */
+  const ORDERS = ['taxable', 'bracket', 'rrsp'];
+  function compareOrders(p, paths, have) {
+    const list = ORDERS.map(strategy => {
+      const q = Object.assign({}, p, { strategy });
+      const mc = have && have.strategy === strategy ? have.mc : monteCarlo(q, paths, true, true);
+      return { strategy, p: q, mc, success: mc.success, estate: mc.estate };
+    });
+    const top = Math.max(...list.map(x => x.success));
+    let best = null;
+    for (const x of list) {
+      if (x.success < top - 0.005) continue;
+      if (!best || x.estate > best.estate || (x.estate === best.estate && x.success > best.success)) best = x;
+    }
+    return { list, best };
+  }
+
   /* Largest after-tax spending that is funded in at least `confidence` of paths. */
   function sustainableSpending(p, paths, confidence) {
     let lo = 0, hi = 600000;
@@ -639,7 +686,7 @@ const Engine = (() => {
     return Math.floor(lo / 500) * 500;
   }
 
-  return { tax, healthPremium, rrifFactor, cppAnnual, oasAnnual, run, deterministic, monteCarlo,
+  return { tax, healthPremium, rrifFactor, cppAnnual, oasAnnual, run, deterministic, monteCarlo, compareOrders, ORDERS,
     sustainableSpending, realRate, drawStartIndex, yearCount, CPP_MAX_MONTHLY, OAS_MONTHLY, OAS_THRESHOLD };
 })();
 
@@ -651,7 +698,7 @@ const Engine = (() => {
   const NEAR_YEARS = 15, NEAR_SHARE = 2 / 3;   // the savings chart gives the next 15 years two thirds of its width
   const PERSON_A = { age: 45, retire: 63, rrsp: 250000, tfsa: 90000, cRrsp: 12000, cTfsa: 7000, cpp: 1100, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
   const PERSON_B = { age: 43, retire: 61, rrsp: 180000, tfsa: 70000, cRrsp: 8000, cTfsa: 5000, cpp: 850, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
-  const EXAMPLE = { mode: 'joint', a: PERSON_A, b: PERSON_B, end: 95, nonreg: 40000, cNonreg: 0, spend: 85000, rent: 0, sale: 0, saleYear: Y0 + 10, rentStops: true, ret: 5.5, infl: 2.1, vol: 10, strategy: 'taxable' };
+  const EXAMPLE = { mode: 'joint', a: PERSON_A, b: PERSON_B, end: 95, nonreg: 40000, cNonreg: 0, spend: 85000, rent: 0, sale: 0, saleYear: Y0 + 10, rentStops: true, ret: 5.5, infl: 2.1, vol: 10, strategy: 'auto' };
   const PF = { age: 'age', retire: 'retire', rrsp: 'rrsp', tfsa: 'tfsa', cRrsp: 'c-rrsp', cTfsa: 'c-tfsa', cpp: 'cpp', cppAge: 'cpp-age', oasAge: 'oas-age', oasYears: 'oas-years', db: 'db', dbAge: 'db-age' };
   const SF = { end: 'in-end', nonreg: 'in-nonreg', cNonreg: 'in-c-nonreg', spend: 'in-spend', rent: 'in-rent', sale: 'in-sale', saleYear: 'in-sale-year', ret: 'in-ret', infl: 'in-infl', vol: 'in-vol' };
   const SERIES = [
@@ -663,6 +710,8 @@ const Engine = (() => {
     { key: 'wN', label: 'Non-registered', color: 'var(--s-nonreg)' },
     { key: 'wT', label: 'TFSA', color: 'var(--s-tfsa)' }
   ];
+  const ORDER_NAMES = { taxable: 'Non-registered, then RRSP, then TFSA', bracket: 'RRSP up to the lowest tax bracket, then the rest', rrsp: 'RRSP first, then non-registered, then TFSA' };
+  let autoPick = 'bracket';   // the order Automatic chose last time, used for the first draw
   const STORE = 'retirement-income-simulator-couple-v1';
 
   const money = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0, currencyDisplay: 'narrowSymbol' });
@@ -971,6 +1020,24 @@ const Engine = (() => {
     }
   }
 
+  function drawOrders(cmp, inUse, auto) {
+    const host = $('orders'); host.replaceChildren();
+    for (const x of cmp.list) {
+      const used = x.strategy === inUse;
+      const row = el('div', 'order-row' + (used ? ' current' : '')), name = el('div', 'order-name');
+      name.appendChild(el('span', null, ORDER_NAMES[x.strategy]));
+      if (used) name.appendChild(el('span', 'tag', auto ? 'Picked' : 'Your choice'));
+      if (!auto && x === cmp.best && !used) name.appendChild(el('span', 'tag alt', "Automatic's pick"));
+      const stats = el('div', 'order-stats');
+      const stat = (value, label) => { const sp = el('span'); sp.append(el('b', null, value), document.createTextNode(' ' + label)); stats.appendChild(sp); };
+      stat(Math.round(x.success * 100) + '%', 'chance the money lasts');
+      stat(fmt(x.estate), 'left after tax');
+      row.append(name, stats); host.appendChild(row);
+    }
+    const best = ORDER_NAMES[cmp.best.strategy];
+    $('order-hint').textContent = auto ? 'Using: ' + best + '.' : cmp.best.strategy === inUse ? 'Automatic would pick this one too.' : 'Automatic would pick: ' + best + '.';
+  }
+
   /* ---------- run ---------- */
   let state = null, job = 0;
   function recalc() {
@@ -981,28 +1048,45 @@ const Engine = (() => {
       applyMode(v.mode); v = read();
     }
     spendBy[v.mode] = v.spend; v.spendBy = spendBy;
-    const p = toParams(v), mine = ++job;
+    const base = toParams(v), mine = ++job, auto = v.strategy === 'auto';
     $('spend-hint').textContent = fmt(v.spend / 12) + COPY[v.mode].month;
-    const det = Engine.deterministic(p), mc = Engine.monteCarlo(p, PATHS, true);
-    state = { p, det, mc };
-    drawSummary(p, mc); drawFan(p, mc); drawIncome(p, det.rows); drawLedger(p, det.rows);
-    $('st-safe').classList.add('pending'); $('ages').classList.add('pending');
+    const save = () => { v.autoPick = autoPick; v.orderV = 2; try { localStorage.setItem(STORE, JSON.stringify(v)); } catch (e) {} };
+    const render = (p, mc) => {
+      const det = Engine.deterministic(p);
+      state = { p, det, mc };
+      drawSummary(p, mc); drawFan(p, mc); drawIncome(p, det.rows); drawLedger(p, det.rows);
+    };
+    /* Draw straight away with the order used last time, then test every order in the background and redraw if another one wins. */
+    let p = Object.assign({}, base, { strategy: auto ? autoPick : v.strategy });
+    let mc = Engine.monteCarlo(p, PATHS, true, true);
+    render(p, mc);
+    for (const id of ['st-safe', 'ages', 'orders', 'order-hint']) $(id).classList.add('pending');
+    save();
     setTimeout(() => {
       if (mine !== job) return;
-      const safe = Engine.sustainableSpending(p, SIDE_PATHS, 0.9);
-      $('st-safe').textContent = fmt(safe) + ' a year';
-      $('st-safe-sub').textContent = fmt(safe / 12) + ' a month after tax';
-      $('st-safe').classList.remove('pending');
-      const list = [];
-      for (let k = -3; k <= 3; k++) {
-        if (p.people.some(q => q.retireAge + k < q.age || q.retireAge + k > 75)) continue;
-        const shifted = Object.assign({}, p, { people: p.people.map(q => Object.assign({}, q, { retireAge: q.retireAge + k })) });
-        if (Engine.drawStartIndex(shifted) >= Engine.yearCount(shifted)) continue;
-        list.push({ shift: k, success: k === 0 ? mc.success : Engine.monteCarlo(shifted, SIDE_PATHS, false).success });
+      const cmp = Engine.compareOrders(base, PATHS, { strategy: p.strategy, mc });
+      if (auto) {
+        autoPick = cmp.best.strategy; save();
+        if (autoPick !== p.strategy) { p = cmp.best.p; mc = cmp.best.mc; render(p, mc); }
       }
-      drawAges(p, list); $('ages').classList.remove('pending');
+      drawOrders(cmp, p.strategy, auto);
+      $('orders').classList.remove('pending'); $('order-hint').classList.remove('pending');
+      setTimeout(() => {
+        if (mine !== job) return;
+        const safe = Engine.sustainableSpending(p, SIDE_PATHS, 0.9);
+        $('st-safe').textContent = fmt(safe) + ' a year';
+        $('st-safe-sub').textContent = fmt(safe / 12) + ' a month after tax';
+        $('st-safe').classList.remove('pending');
+        const list = [];
+        for (let k = -3; k <= 3; k++) {
+          if (p.people.some(q => q.retireAge + k < q.age || q.retireAge + k > 75)) continue;
+          const shifted = Object.assign({}, p, { people: p.people.map(q => Object.assign({}, q, { retireAge: q.retireAge + k })) });
+          if (Engine.drawStartIndex(shifted) >= Engine.yearCount(shifted)) continue;
+          list.push({ shift: k, success: k === 0 ? mc.success : Engine.monteCarlo(shifted, SIDE_PATHS, false).success });
+        }
+        drawAges(p, list); $('ages').classList.remove('pending');
+      }, 20);
     }, 30);
-    try { localStorage.setItem(STORE, JSON.stringify(v)); } catch (e) {}
   }
 
   let timer = 0;
@@ -1031,7 +1115,10 @@ const Engine = (() => {
 
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) {}
-  if (saved && saved.a && saved.b) { last = Object.assign(clone(EXAMPLE), saved, { mode: COPY[saved.mode] ? saved.mode : 'joint', a: Object.assign({}, PERSON_A, saved.a), b: Object.assign({}, PERSON_B, saved.b) }); spendBy = Object.assign({}, SPEND, saved.spendBy); fill(last); applyMode(last.mode); $('example-note').hidden = true; }
+  if (saved && saved.a && saved.b) { last = Object.assign(clone(EXAMPLE), saved, { mode: COPY[saved.mode] ? saved.mode : 'joint', a: Object.assign({}, PERSON_A, saved.a), b: Object.assign({}, PERSON_B, saved.b) }); spendBy = Object.assign({}, SPEND, saved.spendBy);
+    if (saved.orderV !== 2 || !(last.strategy === 'auto' || ORDER_NAMES[last.strategy])) last.strategy = 'auto';
+    if (ORDER_NAMES[saved.autoPick]) autoPick = saved.autoPick;
+    fill(last); applyMode(last.mode); $('example-note').hidden = true; }
   else fill(EXAMPLE);
   recalc();
 
