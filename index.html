@@ -130,6 +130,7 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 12px; height: 12px; border-radius: 2px; flex: none; }
 .legend i.line { height: 2px; width: 16px; border-radius: 1px; }
+.legend i.dash { height: 12px; width: 0; border-radius: 0; border-left: 1px dashed var(--ink-2); }
 .plot { position: relative; }
 .plot svg { display: block; width: 100%; touch-action: pan-y; }
 .plot text { font-family: var(--body); font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
@@ -226,34 +227,34 @@ details summary { cursor: pointer; font-weight: 600; }
           <legend>Savings today</legend>
           <div class="who" aria-hidden="true"><span>You</span><span>Your wife</span></div>
           <div class="pair"><span class="pair-label">RRSP / RRIF</span>
-            <div class="control"><span class="affix">$</span><input id="a-rrsp" aria-label="RRSP / RRIF, you" type="number" inputmode="numeric" min="0" step="5000"></div>
-            <div class="control"><span class="affix">$</span><input id="b-rrsp" aria-label="RRSP / RRIF, your wife" type="number" inputmode="numeric" min="0" step="5000"></div></div>
+            <div class="control"><span class="affix">$</span><input id="a-rrsp" aria-label="RRSP / RRIF, you" type="text" data-money inputmode="numeric" step="5000"></div>
+            <div class="control"><span class="affix">$</span><input id="b-rrsp" aria-label="RRSP / RRIF, your wife" type="text" data-money inputmode="numeric" step="5000"></div></div>
           <div class="pair"><span class="pair-label">TFSA</span>
-            <div class="control"><span class="affix">$</span><input id="a-tfsa" aria-label="TFSA, you" type="number" inputmode="numeric" min="0" step="5000"></div>
-            <div class="control"><span class="affix">$</span><input id="b-tfsa" aria-label="TFSA, your wife" type="number" inputmode="numeric" min="0" step="5000"></div></div>
-          <div class="field wide"><label for="in-nonreg" id="lb-nonreg">Joint non-registered investments</label><div class="control"><span class="affix">$</span><input id="in-nonreg" type="number" inputmode="numeric" min="0" step="5000"></div></div>
+            <div class="control"><span class="affix">$</span><input id="a-tfsa" aria-label="TFSA, you" type="text" data-money inputmode="numeric" step="5000"></div>
+            <div class="control"><span class="affix">$</span><input id="b-tfsa" aria-label="TFSA, your wife" type="text" data-money inputmode="numeric" step="5000"></div></div>
+          <div class="field wide"><label for="in-nonreg" id="lb-nonreg">Joint non-registered investments</label><div class="control"><span class="affix">$</span><input id="in-nonreg" type="text" data-money inputmode="numeric" step="5000"></div></div>
         </fieldset>
         <fieldset>
           <legend>Saved each year while working</legend>
           <div class="who" aria-hidden="true"><span>You</span><span>Your wife</span></div>
           <div class="pair"><span class="pair-label">To RRSP</span>
-            <div class="control"><span class="affix">$</span><input id="a-c-rrsp" aria-label="To RRSP, you" type="number" inputmode="numeric" min="0" step="500"></div>
-            <div class="control"><span class="affix">$</span><input id="b-c-rrsp" aria-label="To RRSP, your wife" type="number" inputmode="numeric" min="0" step="500"></div></div>
+            <div class="control"><span class="affix">$</span><input id="a-c-rrsp" aria-label="To RRSP, you" type="text" data-money inputmode="numeric" step="500"></div>
+            <div class="control"><span class="affix">$</span><input id="b-c-rrsp" aria-label="To RRSP, your wife" type="text" data-money inputmode="numeric" step="500"></div></div>
           <div class="pair"><span class="pair-label">To TFSA</span>
-            <div class="control"><span class="affix">$</span><input id="a-c-tfsa" aria-label="To TFSA, you" type="number" inputmode="numeric" min="0" step="500"></div>
-            <div class="control"><span class="affix">$</span><input id="b-c-tfsa" aria-label="To TFSA, your wife" type="number" inputmode="numeric" min="0" step="500"></div></div>
-          <div class="field wide"><label for="in-c-nonreg" id="lb-c-nonreg">To joint non-registered</label><div class="control"><span class="affix">$</span><input id="in-c-nonreg" type="number" inputmode="numeric" min="0" step="500"></div></div>
+            <div class="control"><span class="affix">$</span><input id="a-c-tfsa" aria-label="To TFSA, you" type="text" data-money inputmode="numeric" step="500"></div>
+            <div class="control"><span class="affix">$</span><input id="b-c-tfsa" aria-label="To TFSA, your wife" type="text" data-money inputmode="numeric" step="500"></div></div>
+          <div class="field wide"><label for="in-c-nonreg" id="lb-c-nonreg">To joint non-registered</label><div class="control"><span class="affix">$</span><input id="in-c-nonreg" type="text" data-money inputmode="numeric" step="500"></div></div>
         </fieldset>
         <fieldset>
           <legend>Retirement spending</legend>
-          <div class="field wide"><label for="in-spend" id="lb-spend">Household spending per year, after tax</label><div class="control"><span class="affix">$</span><input id="in-spend" type="number" inputmode="numeric" min="0" step="1000"></div><input id="in-spend-range" type="range" min="30000" max="250000" step="1000" aria-label="Household spending per year, after tax"><p class="hint" id="spend-hint"></p></div>
+          <div class="field wide"><label for="in-spend" id="lb-spend">Household spending per year, after tax</label><div class="control"><span class="affix">$</span><input id="in-spend" type="text" data-money inputmode="numeric" step="1000"></div><input id="in-spend-range" type="range" min="30000" max="250000" step="1000" aria-label="Household spending per year, after tax"><p class="hint" id="spend-hint"></p></div>
         </fieldset>
         <fieldset>
           <legend>CPP and OAS</legend>
           <div class="who" aria-hidden="true"><span>You</span><span>Your wife</span></div>
           <div class="pair"><span class="pair-label">CPP estimate at 65, per month</span>
-            <div class="control"><span class="affix">$</span><input id="a-cpp" aria-label="CPP estimate at 65, per month, you" type="number" inputmode="numeric" min="0" step="25"></div>
-            <div class="control"><span class="affix">$</span><input id="b-cpp" aria-label="CPP estimate at 65, per month, your wife" type="number" inputmode="numeric" min="0" step="25"></div></div>
+            <div class="control"><span class="affix">$</span><input id="a-cpp" aria-label="CPP estimate at 65, per month, you" type="text" data-money inputmode="decimal" step="25"></div>
+            <div class="control"><span class="affix">$</span><input id="b-cpp" aria-label="CPP estimate at 65, per month, your wife" type="text" data-money inputmode="decimal" step="25"></div></div>
           <p class="hint" id="hint-cpp">Maximum is $1,507.65 each. Your own estimates are in My Service Canada Account.</p>
           <div class="pair"><span class="pair-label">Start CPP at</span>
             <div class="control"><select id="a-cpp-age" aria-label="Start CPP at, you"></select></div>
@@ -270,8 +271,8 @@ details summary { cursor: pointer; font-weight: 600; }
           <legend id="lg-db">Workplace pensions</legend>
           <div class="who" aria-hidden="true"><span>You</span><span>Your wife</span></div>
           <div class="pair"><span class="pair-label">Per year</span>
-            <div class="control"><span class="affix">$</span><input id="a-db" aria-label="Per year, you" type="number" inputmode="numeric" min="0" step="1000"></div>
-            <div class="control"><span class="affix">$</span><input id="b-db" aria-label="Per year, your wife" type="number" inputmode="numeric" min="0" step="1000"></div></div>
+            <div class="control"><span class="affix">$</span><input id="a-db" aria-label="Per year, you" type="text" data-money inputmode="numeric" step="1000"></div>
+            <div class="control"><span class="affix">$</span><input id="b-db" aria-label="Per year, your wife" type="text" data-money inputmode="numeric" step="1000"></div></div>
           <div class="pair"><span class="pair-label">Starting at age</span>
             <div class="control"><input id="a-db-age" aria-label="Starting at age, you" type="number" inputmode="numeric" min="50" max="75" step="1"></div>
             <div class="control"><input id="b-db-age" aria-label="Starting at age, your wife" type="number" inputmode="numeric" min="50" max="75" step="1"></div></div>
@@ -307,6 +308,7 @@ details summary { cursor: pointer; font-weight: 600; }
           <span><i class="line" style="background: var(--accent)"></i>Median path</span>
           <span><i style="background: var(--accent); opacity: 0.34"></i>Middle half of paths</span>
           <span><i style="background: var(--accent); opacity: 0.14"></i>8 of 10 paths</span>
+          <span id="fan-note" hidden><i class="dash"></i>Next 15 years shown wider</span>
         </div>
         <div class="plot" id="fan"></div>
       </section>
@@ -631,6 +633,7 @@ const Engine = (() => {
 (() => {
   const $ = id => document.getElementById(id);
   const PATHS = 1000, SIDE_PATHS = 300, Y0 = new Date().getFullYear();
+  const NEAR_YEARS = 15, NEAR_SHARE = 2 / 3;   // the savings chart gives the next 15 years two thirds of its width
   const PERSON_A = { age: 45, retire: 63, rrsp: 250000, tfsa: 90000, cRrsp: 12000, cTfsa: 7000, cpp: 1100, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
   const PERSON_B = { age: 43, retire: 61, rrsp: 180000, tfsa: 70000, cRrsp: 8000, cTfsa: 5000, cpp: 850, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
   const EXAMPLE = { mode: 'joint', a: PERSON_A, b: PERSON_B, end: 95, nonreg: 40000, cNonreg: 0, spend: 85000, ret: 5.5, infl: 2.1, vol: 10, strategy: 'taxable' };
@@ -653,6 +656,21 @@ const Engine = (() => {
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const clone = v => JSON.parse(JSON.stringify(v));
 
+  /* Dollar fields are text inputs that show thousands separators. raw() strips a typed value back to digits and one decimal point. */
+  const raw = s => { const t = String(s).replace(/[^0-9.]/g, ''), d = t.indexOf('.'); return d < 0 ? t : t.slice(0, d + 1) + t.slice(d + 1).replace(/\./g, ''); };
+  const commas = s => { const t = raw(s), d = t.indexOf('.'); return (d < 0 ? t : t.slice(0, d)).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (d < 0 ? '' : t.slice(d)); };
+  const isMoney = node => !!node && node.nodeType === 1 && node.hasAttribute('data-money');
+  const setVal = (id, v) => { const node = $(id); node.value = isMoney(node) ? commas(v) : v; };
+  function regroup(node) {   // re-insert the commas while typing, keeping the caret after the same digit
+    const out = commas(node.value);
+    if (out === node.value) return;
+    const keep = raw(node.value.slice(0, node.selectionStart == null ? node.value.length : node.selectionStart)).length;
+    node.value = out;
+    let i = 0, seen = 0;
+    while (i < out.length && seen < keep) { if (out[i] !== ',') seen++; i++; }
+    try { node.setSelectionRange(i, i); } catch (e) {}
+  }
+
   for (const who of ['a', 'b']) for (const key of ['cpp-age', 'oas-age']) {
     const from = key === 'cpp-age' ? 60 : 65;
     for (let a = from; a <= 70; a++) $(who + '-' + key).appendChild(new Option('Age ' + a, a));
@@ -660,10 +678,10 @@ const Engine = (() => {
 
   function fill(v) {
     for (const who of ['a', 'b']) {
-      for (const k in PF) $(who + '-' + PF[k]).value = v[who][k];
+      for (const k in PF) setVal(who + '-' + PF[k], v[who][k]);
       $(who + '-db-indexed').checked = !!v[who].dbIndexed;
     }
-    for (const k in SF) $(SF[k]).value = v[k];
+    for (const k in SF) setVal(SF[k], v[k]);
     $('in-strategy').value = v.strategy;
     $('in-spend-range').value = v.spend;
     $('mode-' + v.mode).checked = true;
@@ -672,7 +690,7 @@ const Engine = (() => {
   function read() {
     const v = { a: {}, b: {} };
     v.mode = $('mode-a').checked ? 'a' : $('mode-b').checked ? 'b' : 'joint';
-    const num = (id, fallback) => { const n = parseFloat($(id).value); return Number.isFinite(n) ? n : fallback; };
+    const num = (id, fallback) => { const node = $(id), n = parseFloat(isMoney(node) ? raw(node.value) : node.value); return Number.isFinite(n) ? n : fallback; };
     for (const who of ['a', 'b']) {
       const q = v[who];
       for (const k in PF) q[k] = num(who + '-' + PF[k], last[who][k]);
@@ -740,21 +758,41 @@ const Engine = (() => {
     for (let v = 0; v < max + step - 1e-6; v += step) ticks.push(v);
     return ticks;
   }
-  function frame(host, yMax, n, firstYear, bands) {
+  /* With `focus` set (line charts only), the first `focus` years get NEAR_SHARE of the width and the later years
+     share the rest. Plans too short for that to stretch anything keep an even scale. */
+  function frame(host, yMax, n, firstYear, bands, focus) {
     const W = Math.max(280, host.clientWidth), H = W < 480 ? 250 : 310;
     const m = { l: 50, r: 14, t: 24, b: 26 };
     const ticks = niceTicks(yMax, 4), top = ticks[ticks.length - 1];
-    const pw = W - m.l - m.r, ph = H - m.t - m.b;
-    const x = bands ? i => m.l + (i + 0.5) * pw / n : i => m.l + i / Math.max(1, n - 1) * pw;
+    const pw = W - m.l - m.r, ph = H - m.t - m.b, base = m.t + ph;
+    const K = !bands && focus && focus / (n - 1) < NEAR_SHARE ? focus : 0;
+    const x = bands ? i => m.l + (i + 0.5) * pw / n
+      : K ? i => m.l + (i <= K ? i / K * NEAR_SHARE : NEAR_SHARE + (i - K) / (n - 1 - K) * (1 - NEAR_SHARE)) * pw
+      : i => m.l + i / Math.max(1, n - 1) * pw;
+    const inv = px => {   // year index (fractional) under a pixel position
+      const u = clamp((px - m.l) / pw, 0, 1);
+      return !K ? u * (n - 1) : u <= NEAR_SHARE ? u / NEAR_SHARE * K : K + (u - NEAR_SHARE) / (1 - NEAR_SHARE) * (n - 1 - K);
+    };
     const y = v => m.t + ph - v / top * ph;
     let s = '';
     for (const t of ticks) {
       s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}" stroke="${t === 0 ? 'var(--line-strong)' : 'var(--line)'}" stroke-width="1"/>`;
       s += `<text x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${compact(t)}</text>`;
     }
-    const every = n / (W / 70) > 5 ? 10 : 5;
-    for (let i = 0; i < n; i++) if ((firstYear + i) % every === 0) s += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${firstYear + i}</text>`;
-    return { W, H, m, pw, ph, x, y, top, grid: s };
+    if (K) {
+      const near = NEAR_SHARE * pw / K, far = (1 - NEAR_SHARE) * pw / (n - 1 - K), GAP = 38;
+      const stepNear = [1, 2, 3, 5].find(st => st * near >= GAP) || 5, stepFar = [5, 10].find(st => st * far >= GAP) || 10;
+      let lastX = -Infinity;
+      const tick = i => { s += `<line x1="${x(i)}" x2="${x(i)}" y1="${base}" y2="${base + 4}" stroke="var(--line-strong)" stroke-width="1"/>`; };
+      const year = i => { s += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${firstYear + i}</text>`; lastX = x(i); };
+      for (let i = 0; i <= K; i++) { tick(i); if (i % stepNear === 0) year(i); }
+      for (let i = K + 1; i < n; i++) if ((firstYear + i) % stepFar === 0 && x(i) - lastX >= GAP) { tick(i); year(i); }
+      s += `<line x1="${x(K)}" x2="${x(K)}" y1="${m.t}" y2="${base}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 4"/>`;
+    } else {
+      const every = n / (W / 70) > 5 ? 10 : 5;
+      for (let i = 0; i < n; i++) if ((firstYear + i) % every === 0) s += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${firstYear + i}</text>`;
+    }
+    return { W, H, m, pw, ph, x, y, inv, top, focus: K, grid: s };
   }
   function showTip(host, tip, px, build) {
     tip.replaceChildren(); build(tip); tip.hidden = false;
@@ -772,7 +810,8 @@ const Engine = (() => {
   function drawFan(p, mc) {
     const host = $('fan'), b = mc.bands, n = b[0].length;
     let yMax = 0; for (let i = 0; i < n; i++) yMax = Math.max(yMax, b[4][i]);
-    const f = frame(host, yMax, n, Y0, false);
+    const f = frame(host, yMax, n, Y0, false, NEAR_YEARS);
+    $('fan-note').hidden = !f.focus;
     const pts = (arr, rev) => { const o = []; for (let i = 0; i < n; i++) { const j = rev ? n - 1 - i : i; o.push(f.x(j).toFixed(1) + ',' + f.y(arr[j]).toFixed(1)); } return o.join(' '); };
     const ri = Engine.drawStartIndex(p), rx = f.x(ri), ry = f.y(b[2][ri]);
     let s = `<svg viewBox="0 0 ${f.W} ${f.H}" height="${f.H}" role="img" aria-label="Savings by year: median path with the range of simulated outcomes">` + f.grid;
@@ -792,7 +831,7 @@ const Engine = (() => {
     const cross = host.querySelector('#fan-cross'), hit = host.querySelector('#fan-hit');
     const move = e => {
       const r = host.getBoundingClientRect(), px = e.clientX - r.left;
-      const i = clamp(Math.round((px - f.m.l) / f.pw * (n - 1)), 0, n - 1), cx = f.x(i);
+      const i = clamp(Math.round(f.inv(px)), 0, n - 1), cx = f.x(i);
       cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.setAttribute('visibility', 'visible');
       showTip(host, tip, cx, t => {
         t.appendChild(el('h3', null, `${Y0 + i}, ${ages(p, i)}`));
@@ -917,7 +956,7 @@ const Engine = (() => {
     let v = read();
     if (v.mode !== mode) {
       spendBy[mode] = v.spend;
-      $('in-spend').value = spendBy[v.mode]; $('in-spend-range').value = spendBy[v.mode];
+      setVal('in-spend', spendBy[v.mode]); $('in-spend-range').value = spendBy[v.mode];
       applyMode(v.mode); v = read();
     }
     spendBy[v.mode] = v.spend; v.spendBy = spendBy;
@@ -951,10 +990,20 @@ const Engine = (() => {
   form.addEventListener('submit', e => e.preventDefault());
   form.addEventListener('input', e => {
     const id = e.target.id;
-    if (id === 'in-spend-range') $('in-spend').value = e.target.value;
-    else if (id === 'in-spend') $('in-spend-range').value = e.target.value;
+    if (isMoney(e.target)) regroup(e.target);
+    if (id === 'in-spend-range') setVal('in-spend', e.target.value);
+    else if (id === 'in-spend') $('in-spend-range').value = raw(e.target.value);
     $('example-note').hidden = true;
     schedule();
+  });
+  /* Up and down arrows nudge a dollar field by its step, as they did when these were number fields. */
+  form.addEventListener('keydown', e => {
+    const t = e.target;
+    if (!isMoney(t) || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault();
+    const step = parseFloat(t.getAttribute('step')) || 1, cur = parseFloat(raw(t.value)) || 0;
+    t.value = commas(Math.round(Math.max(0, cur + (e.key === 'ArrowUp' ? step : -step)) * 100) / 100);
+    t.dispatchEvent(new Event('input', { bubbles: true }));
   });
   for (const id of ['mode-joint', 'mode-a', 'mode-b']) $(id).addEventListener('change', recalc);
   $('reset').addEventListener('click', () => { fill(EXAMPLE); last = clone(EXAMPLE); spendBy = Object.assign({}, SPEND); applyMode('joint'); $('example-note').hidden = false; try { localStorage.removeItem(STORE); } catch (e) {} recalc(); });
