@@ -123,6 +123,40 @@ button { font: inherit; font-weight: 500; color: var(--ink); background: transpa
 button:hover { border-color: var(--accent); color: var(--accent); }
 button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Budget tab */
+.tabs { margin-bottom: 16px; }
+.budget { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); grid-template-areas: "form summary"; gap: 20px 24px; align-items: start; }
+.b-form { grid-area: form; padding: 0; }
+.b-summary { grid-area: summary; position: sticky; top: 16px; }
+@media (max-width: 880px) {
+  .budget { grid-template-columns: minmax(0, 1fr); grid-template-areas: "summary" "form"; }
+  .b-summary { position: static; }
+}
+.b-intro { padding: 14px 20px 0; font-size: 0.86rem; }
+.b-group { border-top: 1px solid var(--line); padding: 14px 20px 16px; display: grid; gap: 8px; }
+#b-groups .b-group:first-child { border-top: 0; }
+.b-group-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-weight: 600; font-size: 0.78rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 2px; }
+.b-group-head b { font-weight: 600; font-size: 0.86rem; letter-spacing: 0; text-transform: none; color: var(--ink); font-variant-numeric: tabular-nums; }
+.b-row { display: grid; grid-template-columns: minmax(0, 1fr) 132px 108px; gap: 8px; align-items: center; }
+.b-row > label { font-size: 0.9rem; }
+.b-name-wrap { display: flex; gap: 6px; min-width: 0; }
+.b-name-wrap .control { flex: 1; }
+.b-remove { font-size: 0.8rem; padding: 3px 9px; flex: none; }
+@media (max-width: 520px) {
+  .b-row { grid-template-columns: minmax(0, 1fr) 108px; gap: 4px 8px; margin-bottom: 4px; }
+  .b-row > :first-child { grid-column: 1 / -1; }
+}
+.b-form .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.b-bars { display: grid; gap: 6px; margin-top: 18px; }
+.b-bars:empty { display: none; }
+.b-bar { display: grid; grid-template-columns: 8.5em minmax(0, 1fr) 4.6em; align-items: center; gap: 10px; font-size: 0.9rem; color: var(--ink-2); }
+.b-bar .track { height: 10px; background: var(--accent-soft); border-radius: 2px; overflow: hidden; }
+.b-bar .fill { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+.b-bar b { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; color: var(--ink); }
+.b-link { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); display: grid; gap: 10px; justify-items: start; color: var(--ink-2); font-size: 0.9rem; }
+.b-link button { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.b-link button:hover { color: var(--on-accent); opacity: 0.9; }
+
 /* Property list */
 .props { grid-column: 1 / -1; display: grid; gap: 10px; min-width: 0; }
 .props:empty { display: none; }
@@ -205,6 +239,13 @@ details summary { cursor: pointer; font-weight: 600; }
     <h1>Retirement Income Simulator</h1>
     <p>Ontario, 2026 tax rules. Every figure is in today's dollars.</p>
   </header>
+
+  <div class="tabs">
+    <div class="segments" role="radiogroup" aria-label="View">
+      <label><input type="radio" name="view" id="tab-plan" value="plan" checked><span>Simulator</span></label>
+      <label><input type="radio" name="view" id="tab-budget" value="budget"><span>Budget</span></label>
+    </div>
+  </div>
 
   <div class="scenario">
     <span id="scenario-label">Scenario</span>
@@ -405,6 +446,24 @@ details summary { cursor: pointer; font-weight: 600; }
         </details>
       </section>
     </div>
+  </div>
+
+  <div class="budget" id="pane-budget" hidden>
+    <section class="panel b-summary" aria-live="polite">
+      <div class="odds-num" id="b-month">$0</div>
+      <div class="odds-label">a month</div>
+      <p class="odds-text" id="b-year"></p>
+      <div class="b-bars" id="b-bars"></div>
+      <div class="b-link">
+        <p id="b-note"></p>
+        <button type="button" id="b-apply">Use this as retirement spending</button>
+      </div>
+    </section>
+    <form class="panel b-form" id="budget-form" autocomplete="off" novalidate>
+      <p class="hint b-intro">Enter what you expect to spend in retirement, in today's dollars. Leave out income tax and money you put into savings: the simulator works those out itself.</p>
+      <div id="b-groups"></div>
+      <div class="actions"><button type="button" id="b-add">Add a category</button><button type="button" id="b-clear">Clear the budget</button></div>
+    </form>
   </div>
 </div>
 
@@ -768,6 +827,8 @@ const Engine = (() => {
   const ORDER_NAMES = { taxable: 'Non-registered, then RRSP, then TFSA', bracket: 'RRSP up to the lowest tax bracket, then the rest', rrsp: 'RRSP first, then non-registered, then TFSA' };
   let autoPick = 'bracket';   // the order Automatic chose last time, used for the first draw
   const STORE = 'retirement-income-simulator-couple-v1';
+  /* Everything typed, on either tab, is saved together in this browser. */
+  function persist() { try { localStorage.setItem(STORE, JSON.stringify(Object.assign({}, last, { budget, view, autoPick, orderV: 2, spendBy }))); } catch (e) {} }
 
   const money = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0, currencyDisplay: 'narrowSymbol' });
   const fmt = v => money.format(Math.round(v));
@@ -1153,6 +1214,104 @@ const Engine = (() => {
     $('order-hint').textContent = auto ? 'Using: ' + best + '.' : cmp.best.strategy === inUse ? 'Automatic would pick this one too.' : 'Automatic would pick: ' + best + '.';
   }
 
+  /* ---------- budget ---------- */
+  /* [key, label, usual frequency]: 'm' for a monthly amount, 'y' for a yearly one. Keys are what gets saved, so keep them stable. */
+  const BUDGET_GROUPS = [
+    { name: 'Housing', items: [['rent', 'Rent or mortgage', 'm'], ['proptax', 'Property tax', 'y'], ['homeins', 'Home insurance', 'y'], ['utilities', 'Utilities', 'm'], ['maint', 'Maintenance and repairs', 'y']] },
+    { name: 'Food', items: [['groceries', 'Groceries', 'm'], ['dining', 'Restaurants and takeout', 'm']] },
+    { name: 'Getting around', items: [['fuel', 'Fuel', 'm'], ['carins', 'Car insurance', 'y'], ['carmaint', 'Car maintenance', 'y'], ['carpay', 'Car payments', 'm'], ['transit', 'Transit, taxis and parking', 'm']] },
+    { name: 'Bills', items: [['phone', 'Phone and internet', 'm'], ['subs', 'TV and subscriptions', 'm'], ['lifeins', 'Life and other insurance', 'm']] },
+    { name: 'Health', items: [['health', 'Dental, vision and prescriptions', 'y'], ['healthins', 'Health insurance', 'm']] },
+    { name: 'Personal', items: [['clothing', 'Clothing', 'm'], ['care', 'Personal care', 'm'], ['fitness', 'Fitness and sports', 'm']] },
+    { name: 'Leisure and giving', items: [['travel', 'Travel', 'y'], ['fun', 'Entertainment and hobbies', 'm'], ['pets', 'Pets', 'm'], ['gifts', 'Gifts and donations', 'y']] }
+  ];
+  const CUSTOM_GROUP = 'Your own', MAX_CUSTOM = 30;
+  let budget = { items: {}, custom: [] }, view = 'plan';
+  const perYear = it => (it.per === 'y' ? it.amt : it.amt * 12);
+  function normBudget(b) {
+    const one = (x, per) => ({ amt: Math.max(0, +(x && x.amt) || 0), per: x && (x.per === 'y' || x.per === 'm') ? x.per : per });
+    const out = { items: {}, custom: [] };
+    for (const g of BUDGET_GROUPS) for (const [key, , per] of g.items) out.items[key] = one(b && b.items && b.items[key], per);
+    for (const c of (b && Array.isArray(b.custom) ? b.custom : []).slice(0, MAX_CUSTOM)) out.custom.push(Object.assign({ name: String((c && c.name) || '').slice(0, 40) }, one(c, 'm')));
+    return out;
+  }
+  function drawBudget() {
+    const host = $('b-groups'); host.replaceChildren();
+    const row = (id, first, it, label) => {
+      const r = el('div', 'b-row'), c = el('div', 'control'), inp = el('input'), sc = el('div', 'control'), sel = el('select');
+      c.appendChild(el('span', 'affix', '$'));
+      inp.id = id; inp.type = 'text'; inp.inputMode = 'numeric'; inp.dataset.k = 'amt'; inp.setAttribute('data-money', ''); inp.setAttribute('step', '50');
+      inp.setAttribute('aria-label', label + ', amount'); inp.value = commas(it.amt || 0); c.appendChild(inp);
+      sel.dataset.k = 'per'; sel.setAttribute('aria-label', label + ', how often'); sel.append(new Option('a month', 'm'), new Option('a year', 'y')); sel.value = it.per; sc.appendChild(sel);
+      r.append(first, c, sc); return r;
+    };
+    const section = name => { const sec = el('div', 'b-group'), head = el('div', 'b-group-head'); head.append(el('span', null, name), el('b')); sec.appendChild(head); host.appendChild(sec); return sec; };
+    for (const g of BUDGET_GROUPS) {
+      const sec = section(g.name);
+      for (const [key, label] of g.items) {
+        const lb = el('label', null, label); lb.htmlFor = 'b-' + key;
+        const r = row('b-' + key, lb, budget.items[key], label); r.dataset.key = key; sec.appendChild(r);
+      }
+    }
+    if (budget.custom.length) {
+      const sec = section(CUSTOM_GROUP);
+      budget.custom.forEach((it, j) => {
+        const wrap = el('div', 'b-name-wrap'), c = el('div', 'control'), name = el('input', 'b-name'), rm = el('button', 'b-remove', 'Remove');
+        name.type = 'text'; name.maxLength = 40; name.placeholder = 'Category name'; name.dataset.k = 'name'; name.value = it.name; name.setAttribute('aria-label', 'Category name');
+        rm.type = 'button'; rm.setAttribute('aria-label', 'Remove ' + (it.name || 'this category'));
+        rm.addEventListener('click', () => { budget = readBudget(); budget.custom.splice(j, 1); drawBudget(); persist(); });
+        c.appendChild(name); wrap.append(c, rm);
+        sec.appendChild(row('b-custom-' + j, wrap, it, it.name || 'Your category'));
+      });
+    }
+    $('b-add').hidden = budget.custom.length >= MAX_CUSTOM;
+    updateBudgetView();
+  }
+  function readBudget() {
+    const out = { items: {}, custom: [] };
+    for (const r of document.querySelectorAll('#b-groups .b-row')) {
+      const n = parseFloat(raw(r.querySelector('[data-k="amt"]').value));
+      const it = { amt: Number.isFinite(n) ? Math.max(0, n) : 0, per: r.querySelector('[data-k="per"]').value === 'y' ? 'y' : 'm' };
+      if (r.dataset.key) out.items[r.dataset.key] = it;
+      else out.custom.push(Object.assign({ name: r.querySelector('[data-k="name"]').value.trim().slice(0, 40) }, it));
+    }
+    return normBudget(out);
+  }
+  /* Yearly total for each group, in the order shown. */
+  function budgetGroups() {
+    const list = BUDGET_GROUPS.map(g => ({ name: g.name, total: g.items.reduce((sum, [key]) => sum + perYear(budget.items[key] || { amt: 0 }), 0) }));
+    if (budget.custom.length) list.push({ name: CUSTOM_GROUP, total: budget.custom.reduce((sum, it) => sum + perYear(it), 0) });
+    return list;
+  }
+  const budgetTotal = () => budgetGroups().reduce((sum, g) => sum + g.total, 0);
+  function budgetNote() {
+    const total = Math.round(budgetTotal()), spend = Math.round(last.spend), name = { joint: 'Both', a: 'Self', b: 'Spouse' }[mode], diff = total - spend;
+    $('b-note').textContent = total <= 0 ? 'The simulator is using ' + fmt(spend) + ' a year for the ' + name + ' scenario.'
+      : diff === 0 ? 'The simulator is using this figure for the ' + name + ' scenario.'
+      : 'The simulator is using ' + fmt(spend) + ' a year for the ' + name + ' scenario, ' + fmt(Math.abs(diff)) + (diff > 0 ? ' less' : ' more') + ' than this budget.';
+    $('b-apply').hidden = total <= 0 || diff === 0;
+  }
+  function updateBudgetView() {
+    const groups = budgetGroups(), total = groups.reduce((sum, g) => sum + g.total, 0), top = Math.max(1, ...groups.map(g => g.total));
+    document.querySelectorAll('#b-groups .b-group-head b').forEach((node, j) => { node.textContent = groups[j] && groups[j].total > 0 ? fmt(groups[j].total / 12) + ' a month' : ''; });
+    $('b-month').textContent = fmt(total / 12);
+    $('b-year').textContent = total > 0 ? fmt(total) + ' a year, after tax.' : 'Enter amounts to build your budget.';
+    const bars = $('b-bars'); bars.replaceChildren();
+    for (const g of groups) {
+      if (g.total <= 0) continue;
+      const r = el('div', 'b-bar'), track = el('div', 'track'), fillEl = el('div', 'fill');
+      fillEl.style.width = (g.total / top * 100).toFixed(1) + '%'; track.appendChild(fillEl);
+      r.append(el('span', null, g.name), track, el('b', null, fmt(g.total / 12))); bars.appendChild(r);
+    }
+    budgetNote();
+  }
+  function setView(next) {
+    view = next === 'budget' ? 'budget' : 'plan';
+    document.querySelector('.scenario').hidden = document.querySelector('.layout').hidden = view !== 'plan';
+    $('pane-budget').hidden = view !== 'budget';
+    $('tab-' + view).checked = true;
+  }
+
   /* ---------- run ---------- */
   let state = null, job = 0;
   function recalc() {
@@ -1165,7 +1324,8 @@ const Engine = (() => {
     spendBy[v.mode] = v.spend; v.spendBy = spendBy;
     const base = toParams(v), mine = ++job, auto = v.strategy === 'auto';
     $('spend-hint').textContent = fmt(v.spend / 12) + COPY[v.mode].month;
-    const save = () => { v.autoPick = autoPick; v.orderV = 2; try { localStorage.setItem(STORE, JSON.stringify(v)); } catch (e) {} };
+    const save = persist;
+    budgetNote();
     const render = (p, mc) => {
       const det = Engine.deterministic(p);
       state = { p, det, mc };
@@ -1217,14 +1377,39 @@ const Engine = (() => {
     schedule();
   });
   /* Up and down arrows nudge a dollar field by its step, as they did when these were number fields. */
-  form.addEventListener('keydown', e => {
+  const nudgeMoney = e => {
     const t = e.target;
     if (!isMoney(t) || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
     e.preventDefault();
     const step = parseFloat(t.getAttribute('step')) || 1, cur = parseFloat(raw(t.value)) || 0;
     t.value = commas(Math.round(Math.max(0, cur + (e.key === 'ArrowUp' ? step : -step)) * 100) / 100);
     t.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  form.addEventListener('keydown', nudgeMoney);
+
+  /* Budget tab: typing only re-adds the budget, it does not re-run the simulation. */
+  const bform = $('budget-form');
+  const budgetChanged = () => { budget = readBudget(); updateBudgetView(); persist(); };
+  bform.addEventListener('submit', e => e.preventDefault());
+  bform.addEventListener('input', e => { if (isMoney(e.target)) regroup(e.target); budgetChanged(); });
+  bform.addEventListener('keydown', nudgeMoney);
+  $('b-add').addEventListener('click', () => {
+    budget = readBudget();
+    if (budget.custom.length >= MAX_CUSTOM) return;
+    budget.custom.push({ name: '', amt: 0, per: 'm' });
+    drawBudget(); persist();
+    const names = document.querySelectorAll('#b-groups .b-name'); names[names.length - 1].focus();
   });
+  $('b-clear').addEventListener('click', () => {
+    if (!window.confirm('Clear every amount and remove your own categories?')) return;
+    budget = normBudget(null); drawBudget(); persist();
+  });
+  $('b-apply').addEventListener('click', () => {
+    const total = Math.round(budgetTotal());
+    setVal('in-spend', total); $('in-spend-range').value = total; $('example-note').hidden = true;
+    recalc();
+  });
+  for (const id of ['tab-plan', 'tab-budget']) $(id).addEventListener('change', e => { setView(e.target.value); persist(); });
   for (const id of ['mode-joint', 'mode-a', 'mode-b']) $(id).addEventListener('change', recalc);
   $('add-prop').addEventListener('click', () => {
     const cur = readProps();
@@ -1256,6 +1441,8 @@ const Engine = (() => {
     if (ORDER_NAMES[saved.autoPick]) autoPick = saved.autoPick;
     fill(last); applyMode(last.mode); $('example-note').hidden = true; }
   else fill(EXAMPLE);
+  budget = normBudget(saved && saved.budget); drawBudget();
+  setView(saved && saved.view);
   recalc();
 
   let lastW = 0;
