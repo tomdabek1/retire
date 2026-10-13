@@ -201,6 +201,10 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .age-row.current .fill { background: var(--accent); }
 .age-row.current b { font-weight: 600; }
 
+.chart-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-bottom: 10px; }
+.chart-tools .segments label span { padding: 4px 12px; font-size: 0.86rem; }
+.chart-tools .hint { flex: 1 1 260px; font-size: 0.82rem; color: var(--ink-2); }
+
 /* Withdrawal order comparison */
 .order-row { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
 .order-row:first-child { border-top: 0; padding-top: 0; }
@@ -219,6 +223,14 @@ th, td { padding: 6px 7px; text-align: right; white-space: nowrap; border-bottom
 th { position: sticky; top: 0; background: var(--surface); color: var(--ink-2); font-weight: 600; z-index: 1; box-shadow: 0 1px 0 var(--line-strong); }
 th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
 tr:last-child td { border-bottom: 0; }
+tr.mark td { border-top: 2px solid var(--line-strong); }
+td.total { font-weight: 600; }
+/* The balances table is wide: headers may wrap, and the year stays in view when it scrolls sideways. */
+.bal-table th { white-space: normal; vertical-align: bottom; }
+.bal-table th, .bal-table td { padding: 6px 6px; }
+.bal-table th:nth-child(2), .bal-table td:nth-child(2) { text-align: right; }
+.bal-table th:first-child, .bal-table td:first-child { position: sticky; left: 0; background: var(--surface); z-index: 1; }
+.bal-table th:first-child { z-index: 2; }
 td.short { color: var(--crit); font-weight: 600; }
 td.zero { color: var(--muted); }
 
@@ -380,6 +392,13 @@ details summary { cursor: pointer; font-weight: 600; }
           <h2>How your savings could grow and shrink</h2>
           <p id="fan-sub">Your combined savings each year across 1,000 simulated market paths.</p>
         </div>
+        <div class="chart-tools">
+          <div class="segments" role="radiogroup" aria-label="Dollars shown on this chart">
+            <label><input type="radio" name="fan-money" id="fan-real" value="real" checked><span>Real (today's $)</span></label>
+            <label><input type="radio" name="fan-money" id="fan-nominal" value="nominal"><span>Nominal (future $)</span></label>
+          </div>
+          <p class="hint" id="fan-money-note" hidden></p>
+        </div>
         <div class="legend" id="fan-legend">
           <span><i class="line" style="background: var(--accent)"></i>Median path</span>
           <span><i style="background: var(--accent); opacity: 0.34"></i>Middle half of paths</span>
@@ -391,8 +410,8 @@ details summary { cursor: pointer; font-weight: 600; }
 
       <section class="panel">
         <div class="chart-head">
-          <h2>Where each year's income comes from</h2>
-          <p id="inc-sub">Household income before tax each year, if returns match your expected rate every year. The part of each bar above the line goes to income tax.</p>
+          <h2>Where each year's money comes from</h2>
+          <p id="inc-sub">Before tax, if returns match your expected rate every year. CPP, OAS, pensions and rent are income. RRSP, TFSA and non-registered amounts are withdrawals from your savings. The part of each bar above the line goes to income tax, and anything left over is saved again.</p>
         </div>
         <div class="legend" id="inc-legend"></div>
         <div class="plot" id="inc"></div>
@@ -423,6 +442,19 @@ details summary { cursor: pointer; font-weight: 600; }
           <table>
             <thead><tr id="ledger-head"></tr></thead>
             <tbody id="ledger"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="chart-head">
+          <h2>Balances by account</h2>
+          <p id="bal-sub">Each account at the start of the year, from today, on the same steady-return path as the table above. "Added" is sale cash, yearly savings and anything saved again. "Taken out" is what leaves your savings that year. "Growth" is what your investments earn after inflation.</p>
+        </div>
+        <div class="table-scroll" tabindex="0">
+          <table class="bal-table">
+            <thead><tr id="bal-head"></tr></thead>
+            <tbody id="bal"></tbody>
           </table>
         </div>
       </section>
@@ -570,12 +602,14 @@ const Engine = (() => {
         nA += S.nA[i]; acbA += S.nA[i]; nB += S.nB[i]; acbB += S.nB[i];
       }
       const startTotal = rA + rB + tfsa + nA + nB;
+      const sold = rows && S && S.any[i] ? S.rA[i] + S.rB[i] + S.t[i] + S.nA[i] + S.nB[i] : 0;
       if (totals) totals[i] = startTotal;
 
       if (i < drawStart) {
         const wA = ageA < A.retireAge, wB = ageB < B.retireAge;
         const cA = wA ? A.cNonreg || 0 : 0, cB = wB ? B.cNonreg || 0 : 0;
-        if (rows) rows.push({ i, ageA, ageB, phase: 'saving', start: startTotal });
+        if (rows) rows.push({ i, ageA, ageB, phase: 'saving', start: startTotal, bal: [rA, rB, tfsa, nA, nB],
+          added: sold + (wA ? A.cRrsp + A.cTfsa : 0) + (wB ? B.cRrsp + B.cTfsa : 0) + cA + cB, out: 0, growth: startTotal * r });
         rA = rA * (1 + r) + (wA ? A.cRrsp : 0);
         rB = rB * (1 + r) + (wB ? B.cRrsp : 0);
         tfsa = tfsa * (1 + r) + (wA ? A.cTfsa : 0) + (wB ? B.cTfsa : 0);
@@ -659,8 +693,10 @@ const Engine = (() => {
       }
 
       const surplus = Math.max(0, net - target);
-      if (rows) rows.push({ i, ageA, ageB, phase: 'retired', start: startTotal, cpp: cppA + cppB, oas: oasA + oasB, db: dbA + dbB, rent,
-        wR: minA + minB + dR, wN: aN, wT: aT, tax: t, taxA: tA, taxB: tB, net: Math.min(net, target), target, surplus, deducted: uA + uB });
+      let row = null;
+      if (rows) rows.push(row = { i, ageA, ageB, phase: 'retired', start: startTotal, cpp: cppA + cppB, oas: oasA + oasB, db: dbA + dbB, rent,
+        wR: minA + minB + dR, wN: aN, wT: aT, tax: t, taxA: tA, taxB: tB, net: Math.min(net, target), target, surplus, deducted: uA + uB,
+        bal: [rA, rB, tfsa, nA, nB], added: sold + surplus, out: minA + minB + dR + aN + aT });
 
       rA -= minA + dA; rB -= minB + dB;
       if (aNA > 0) { acbA -= acbA * (aNA / nA); nA -= aNA; }
@@ -672,6 +708,7 @@ const Engine = (() => {
         const rest = surplus - toTfsa, toA = p.single ? rest : rest / 2;
         tfsa += toTfsa; nA += toA; acbA += toA; nB += rest - toA; acbB += rest - toA;
       }
+      if (row) row.growth = (Math.max(0, rA) + Math.max(0, rB) + Math.max(0, tfsa) + Math.max(0, nA) + Math.max(0, nB)) * r;
       rA = Math.max(0, rA) * (1 + r); rB = Math.max(0, rB) * (1 + r);
       tfsa = Math.max(0, tfsa) * (1 + r);
       nA = Math.max(0, nA) * (1 + r); nB = Math.max(0, nB) * (1 + r);
@@ -825,14 +862,15 @@ const Engine = (() => {
     { key: 'wT', label: 'TFSA', color: 'var(--s-tfsa)' }
   ];
   const ORDER_NAMES = { taxable: 'Non-registered, then RRSP, then TFSA', bracket: 'RRSP up to the lowest tax bracket, then the rest', rrsp: 'RRSP first, then non-registered, then TFSA' };
+  let fanNominal = false;   // whether the savings chart shows future (nominal) dollars
   let autoPick = 'bracket';   // the order Automatic chose last time, used for the first draw
   const STORE = 'retirement-income-simulator-couple-v1';
   /* Everything typed, on either tab, is saved together in this browser. */
-  function persist() { try { localStorage.setItem(STORE, JSON.stringify(Object.assign({}, last, { budget, view, autoPick, orderV: 2, spendBy }))); } catch (e) {} }
+  function persist() { try { localStorage.setItem(STORE, JSON.stringify(Object.assign({}, last, { budget, view, fanNominal, autoPick, orderV: 2, spendBy }))); } catch (e) {} }
 
   const money = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0, currencyDisplay: 'narrowSymbol' });
   const fmt = v => money.format(Math.round(v));
-  const compact = v => v >= 1e6 ? '$' + (v / 1e6).toFixed(v >= 1e7 ? 0 : 2).replace(/\.?0+$/, '') + 'M' : v >= 1000 ? '$' + Math.round(v / 1000) + 'K' : '$' + Math.round(v);
+  const compact = v => v >= 1e6 ? '$' + (v / 1e6).toFixed(v >= 1e7 ? 0 : 2).replace(/\.0+$|(\.\d*[1-9])0+$/, '$1') + 'M' : v >= 1000 ? '$' + Math.round(v / 1000) + 'K' : '$' + Math.round(v);
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const clone = v => JSON.parse(JSON.stringify(v));
@@ -971,13 +1009,13 @@ const Engine = (() => {
     joint: { people: 'The two of you', end: 'Plan until the younger of you is', nonreg: 'Joint non-registered investments', cNonreg: 'To joint non-registered',
       spend: 'Household spending per year, after tax', cpp: 'Maximum is $1,507.65 each. Your own estimates are in My Service Canada Account.', db: 'Workplace pensions',
       stRet: 'Median savings when you have both retired', fan: 'Your combined savings each year across 1,000 simulated market paths.',
-      inc: 'Household income before tax each year, if returns match your expected rate every year. The part of each bar above the line goes to income tax.',
+      inc: 'Before tax, if returns match your expected rate every year. CPP, OAS, pensions and rent are income. RRSP, TFSA and non-registered amounts are withdrawals from your savings. The part of each bar above the line goes to income tax, and anything left over is saved again.',
       shift: 'Chance the money lasts if you both shift your retirement by the same number of years, with everything else unchanged.',
       ledger: 'The same steady-return path as the income chart, from the year you have both retired. Savings are at the start of each year.', month: ' a month for the two of you' },
     a: { people: 'You', end: 'Plan to age', nonreg: 'Non-registered investments', cNonreg: 'To non-registered',
       spend: 'Spending per year, after tax', cpp: 'Maximum is $1,507.65. Your own estimate is in My Service Canada Account.', db: 'Workplace pension',
       stRet: 'Median savings at retirement', fan: 'Your savings each year across 1,000 simulated market paths.',
-      inc: 'Income before tax each year, if returns match your expected rate every year. The part of each bar above the line goes to income tax.',
+      inc: 'Before tax, if returns match your expected rate every year. CPP, OAS, pensions and rent are income. RRSP, TFSA and non-registered amounts are withdrawals from your savings. The part of each bar above the line goes to income tax, and anything left over is saved again.',
       shift: 'Chance the money lasts if you retire earlier or later, with everything else unchanged.',
       ledger: 'The same steady-return path as the income chart, from the year you retire. Savings are at the start of each year.', month: ' a month' }
   };
@@ -1053,7 +1091,13 @@ const Engine = (() => {
   };
 
   function drawFan(p, mc) {
-    const host = $('fan'), b = mc.bands, n = b[0].length;
+    /* The simulation runs in today's dollars. For the nominal view, each year is scaled up by inflation to that year. */
+    const host = $('fan'), n = mc.bands[0].length;
+    const scale = i => (fanNominal ? Math.pow(1 + p.inflation, i) : 1);
+    const b = fanNominal ? mc.bands.map(band => band.map((v, i) => v * scale(i))) : mc.bands;
+    $('fan-real').checked = !fanNominal; $('fan-nominal').checked = fanNominal;
+    $('fan-money-note').hidden = !fanNominal;
+    $('fan-money-note').textContent = 'Showing what the balances would read in each year, with inflation at ' + (p.inflation * 100).toFixed(1).replace(/\.0$/, '') + '% a year. A dollar then buys less than a dollar today. Everything else on the page stays in today\'s dollars.';
     let yMax = 0; for (let i = 0; i < n; i++) yMax = Math.max(yMax, b[4][i]);
     const f = frame(host, yMax, n, Y0, false, NEAR_YEARS);
     $('fan-note').hidden = !f.focus;
@@ -1085,7 +1129,7 @@ const Engine = (() => {
         tipRow(t, 'Median', fmt(b[2][i]), 'var(--accent)');
         tipRow(t, 'Worse than 3 in 4', fmt(b[1][i]));
         tipRow(t, 'Worst 1 in 10', fmt(b[0][i]));
-        if (p.saleNotes[i]) { t.appendChild(el('div', 'rule')); for (const n of p.saleNotes[i]) tipRow(t, 'Sold: ' + n.name, fmt(n.amount)); }
+        if (p.saleNotes[i]) { t.appendChild(el('div', 'rule')); for (const n of p.saleNotes[i]) tipRow(t, 'Sold: ' + n.name, fmt(n.amount * scale(i))); }
       });
     };
     hit.addEventListener('pointermove', move); hit.addEventListener('pointerdown', move);
@@ -1102,7 +1146,7 @@ const Engine = (() => {
     const n = data.length;
     const f = frame(host, yMax, n, Y0 + data[0].i, true);
     const slot = f.pw / n, bw = Math.max(2, Math.min(24, slot - 2)), rad = Math.min(4, bw / 2), base = f.m.t + f.ph;
-    let s = `<svg viewBox="0 0 ${f.W} ${f.H}" height="${f.H}" role="img" aria-label="Income by source for each year of retirement">` + f.grid;
+    let s = `<svg viewBox="0 0 ${f.W} ${f.H}" height="${f.H}" role="img" aria-label="Where each year's money comes from, by source">` + f.grid;
     s += `<rect id="inc-band" x="0" y="${f.m.t}" width="${slot}" height="${f.ph}" fill="var(--ink)" fill-opacity="0.07" visibility="hidden"/>`;
     data.forEach((r, idx) => {
       const cx = f.x(idx), x0 = cx - bw / 2;
@@ -1139,6 +1183,24 @@ const Engine = (() => {
     };
     hit.addEventListener('pointermove', move); hit.addEventListener('pointerdown', move);
     hit.addEventListener('pointerleave', () => { tip.hidden = true; band.setAttribute('visibility', 'hidden'); });
+  }
+
+  /* Start-of-year balance of every account, with what went in, what came out and what the investments earned. */
+  function drawBalances(p, rows) {
+    const cols = p.single ? [['RRSP', 0], ['TFSA', 2], ['Non-registered', 3]]
+      : [['RRSP, you', 0], ['RRSP, wife', 1], ['TFSAs', 2], ['Non-reg., you', 3], ['Non-reg., wife', 4]];
+    const used = cols.filter(c => rows.some(r => r.bal[c[1]] > 0.5));
+    const head = $('bal-head'); head.replaceChildren();
+    for (const h of ['Year', ...used.map(c => c[0]), 'Total', 'Added', 'Taken out', 'Growth']) head.appendChild(el('th', null, h));
+    const body = $('bal'); body.replaceChildren();
+    rows.forEach((r, j) => {
+      const tr = el('tr', r.phase === 'retired' && j > 0 && rows[j - 1].phase !== 'retired' ? 'mark' : null);
+      const cell = (v, cls, floor) => tr.appendChild(el('td', Math.abs(v) < (floor || 0.5) ? 'zero' : cls || null, Math.abs(v) < (floor || 0.5) ? '–' : fmt(v)));
+      tr.appendChild(el('td', null, String(Y0 + r.i)));
+      for (const c of used) cell(r.bal[c[1]]);
+      cell(r.start, 'total'); cell(r.added, null, 2); cell(r.out); cell(r.growth);   // the withdrawal search can leave a dollar over; don't show that as money added
+      body.appendChild(tr);
+    });
   }
 
   function drawLedger(p, rows) {
@@ -1329,7 +1391,7 @@ const Engine = (() => {
     const render = (p, mc) => {
       const det = Engine.deterministic(p);
       state = { p, det, mc };
-      drawSummary(p, mc); drawFan(p, mc); drawIncome(p, det.rows); drawLedger(p, det.rows);
+      drawSummary(p, mc); drawFan(p, mc); drawIncome(p, det.rows); drawLedger(p, det.rows); drawBalances(p, det.rows);
     };
     /* Draw straight away with the order used last time, then test every order in the background and redraw if another one wins. */
     let p = Object.assign({}, base, { strategy: auto ? autoPick : v.strategy });
@@ -1409,6 +1471,7 @@ const Engine = (() => {
     setVal('in-spend', total); $('in-spend-range').value = total; $('example-note').hidden = true;
     recalc();
   });
+  for (const id of ['fan-real', 'fan-nominal']) $(id).addEventListener('change', e => { fanNominal = e.target.value === 'nominal'; if (state) drawFan(state.p, state.mc); persist(); });
   for (const id of ['tab-plan', 'tab-budget']) $(id).addEventListener('change', e => { setView(e.target.value); persist(); });
   for (const id of ['mode-joint', 'mode-a', 'mode-b']) $(id).addEventListener('change', recalc);
   $('add-prop').addEventListener('click', () => {
@@ -1439,6 +1502,7 @@ const Engine = (() => {
     delete last.nonreg; delete last.cNonreg;
     if (saved.orderV !== 2 || !(last.strategy === 'auto' || ORDER_NAMES[last.strategy])) last.strategy = 'auto';
     if (ORDER_NAMES[saved.autoPick]) autoPick = saved.autoPick;
+    fanNominal = saved.fanNominal === true;
     fill(last); applyMode(last.mode); $('example-note').hidden = true; }
   else fill(EXAMPLE);
   budget = normBudget(saved && saved.budget); drawBudget();
