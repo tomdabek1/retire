@@ -123,6 +123,16 @@ button { font: inherit; font-weight: 500; color: var(--ink); background: transpa
 button:hover { border-color: var(--accent); color: var(--accent); }
 button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Property list */
+.props { grid-column: 1 / -1; display: grid; gap: 10px; min-width: 0; }
+.props:empty { display: none; }
+.prop { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; padding: 10px 12px 12px; border: 1px solid var(--line-strong); border-radius: 8px; min-width: 0; }
+.prop-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.prop-name { flex: 1; min-width: 0; font: inherit; font-weight: 600; font-size: 0.9rem; color: var(--ink); background: transparent; border: 0; border-bottom: 1px dashed var(--line-strong); border-radius: 0; padding: 2px 0; outline: none; }
+.prop-name:focus { border-bottom: 1px solid var(--accent); }
+.prop-remove { font-size: 0.8rem; padding: 3px 9px; flex: none; }
+.prop-warn { grid-column: 1 / -1; font-size: 0.8rem; font-weight: 500; color: var(--crit); }
+
 /* Charts */
 .chart-head { display: grid; gap: 2px; margin-bottom: 10px; }
 .chart-head p { color: var(--ink-2); font-size: 0.9rem; max-width: 70ch; }
@@ -182,7 +192,7 @@ details summary { cursor: pointer; font-weight: 600; }
 .pending { opacity: 0.55; }
 @media (prefers-reduced-motion: no-preference) { .age-row .fill { transition: width 0.25s ease; } }
 /* iPhone zooms the page when a focused field is under 16px */
-@media (pointer: coarse) { .control input, .control select { font-size: 16px; } }
+@media (pointer: coarse) { .control input, .control select, .prop-name { font-size: 16px; } }
 </style>
 
 </head>
@@ -293,11 +303,9 @@ details summary { cursor: pointer; font-weight: 600; }
         </fieldset>
         <fieldset>
           <legend>Property</legend>
-          <div class="field wide"><label for="in-rent">Rental income per year, after expenses</label><div class="control"><span class="affix">$</span><input id="in-rent" type="text" data-money inputmode="numeric" step="1000"></div><p class="hint">Before income tax. Counted once savings are being drawn, and assumed to rise with inflation.</p></div>
-          <div class="field"><label for="in-sale">Cash from a sale</label><div class="control"><span class="affix">$</span><input id="in-sale" type="text" data-money inputmode="numeric" step="10000"></div></div>
-          <div class="field"><label for="in-sale-year">Year of the sale</label><div class="control"><input id="in-sale-year" type="number" inputmode="numeric" min="2026" max="2120" step="1"></div></div>
-          <p class="hint">What you would keep after commissions and tax, in today's dollars. It is added to non-registered savings that year. Leave it at $0 if you don't plan to sell.</p>
-          <label class="check" for="in-rent-stops"><input id="in-rent-stops" type="checkbox"> Rental income stops in the year of the sale</label>
+          <p class="hint">For each property, enter the rent you keep per year after expenses and before income tax. If you plan to sell it, add the cash you would keep after commissions and tax, in today's dollars, and the year. Rent stops that year and the cash goes into non-registered savings.</p>
+          <div class="props" id="props"></div>
+          <div class="field wide"><button type="button" id="add-prop">Add a property</button></div>
         </fieldset>
         <fieldset>
           <legend>Markets</legend>
@@ -383,7 +391,7 @@ details summary { cursor: pointer; font-weight: 600; }
             <li>Automatic tests the three withdrawal orders on the same 1,000 market paths and uses the one with the best chance your money lasts. Orders within half a percentage point of the best are treated as tied, and the tie goes to the one that leaves the most after tax, counting any RRSP still remaining as taxed all at once in the final year. It only chooses between these three orders, so it is not a full tax plan.</li>
             <li>RRIF minimum withdrawals start at 71 using the CRA percentages. Cash you are forced to withdraw but don't need goes to your TFSAs (up to $7,000 a year each), then to non-registered savings.</li>
             <li>Non-registered growth is taxed as a capital gain when you sell, at 50% inclusion. The cost base starts at today's balance, and gains are split equally between you.</li>
-            <li>Rental income is entered after expenses and before income tax. It keeps pace with inflation, is taxed half to each of you in a joint scenario, and is ignored in the years before savings are drawn. Cash from a property sale is entered after commissions and tax and is added to non-registered savings at the start of the sale year. Property values and any mortgage are not modelled.</li>
+            <li>Rental income is entered after expenses and before income tax. It keeps pace with inflation, is taxed half to each of you in a joint scenario, and is ignored in the years before savings are drawn. Each property's rent stops in the year it is sold. Cash from a sale is entered after commissions and tax and is added to non-registered savings at the start of that year. Property values and any mortgage are not modelled.</li>
             <li>Not included: what happens in a joint scenario after one of you dies (survivor benefits, and tax on one income), CPP sharing, spousal RRSPs, the Guaranteed Income Supplement, the Ontario low-income tax reduction, contribution room limits, investment fees, and tax on what you leave behind.</li>
           </ul>
           <p>Figures come from the <a href="https://www.canada.ca/en/services/benefits/publicpensions/cpp.html" target="_blank" rel="noopener">Government of Canada CPP page</a> and TaxTips.ca tables for <a href="https://www.taxtips.ca/taxrates/on.htm" target="_blank" rel="noopener">Ontario tax rates</a> and <a href="https://www.taxtips.ca/nrcredits/tax-credits-2026.htm" target="_blank" rel="noopener">2026 tax credits</a>. This is a planning estimate and is no substitute for advice from a financial planner.</p>
@@ -481,15 +489,14 @@ const Engine = (() => {
     const drawStart = drawStartIndex(p);
     let failedAt = -1;
     let dR = 0, dA = 0, dB = 0, aN = 0, aT = 0, tA = 0, tB = 0;   // scratch set by alloc() and taxes()
-    /* Property: an after-tax lump sum lands in non-registered savings at the start of the sale year,
-       and net rental income is ordinary income (half each for a couple) until the sale, if it stops then. */
-    const saleAt = p.sale > 0 && p.saleIndex >= 0 ? p.saleIndex : -1;
-    const rentEnd = p.rentStops && saleAt >= 0 ? saleAt : Infinity;
+    /* Property: after-tax sale cash lands in non-registered savings at the start of each sale year,
+       and net rental income is ordinary income (half each for a couple). See propertyPlan(). */
+    const sales = p.saleByYear, rents = p.rentByYear;
 
     for (let i = 0; i < years; i++) {
       const ageA = A.age + i, ageB = B.age + i;
       const r = realReturn(i);
-      if (i === saleAt) { nonreg += p.sale; acb += p.sale; }
+      if (sales && sales[i] > 0) { nonreg += sales[i]; acb += sales[i]; }
       const startTotal = rA + rB + tfsa + nonreg;
       if (totals) totals[i] = startTotal;
 
@@ -510,7 +517,7 @@ const Engine = (() => {
       const dbB = B.dbAmount > 0 && ageB >= B.dbAge ? (B.dbIndexed ? B.dbAmount : B.dbAmount / Math.pow(infl, ageB - B.dbAge)) : 0;
       const minA = rA * rrifFactor(ageA), minB = rB * rrifFactor(ageB);
       const availA = rA - minA, availB = rB - minB, availR = availA + availB;
-      const rent = i < rentEnd ? (p.rent || 0) : 0, rentA = p.single ? rent : rent / 2, rentB = rent - rentA;
+      const rent = rents ? rents[i] : 0, rentA = p.single ? rent : rent / 2, rentB = rent - rentA;
       const baseA = cppA + dbA + minA + rentA, baseB = cppB + dbB + minB + rentB;
       const nA0 = baseA + oasA, nB0 = baseB + oasB;
       const gainFrac = nonreg > 0 ? Math.max(0, 1 - acb / nonreg) : 0;
@@ -593,6 +600,17 @@ const Engine = (() => {
   /* What the final balances are worth after tax, if any remaining RRSP and unrealized gains
      all landed on one tax return in the final year. */
   const afterTax = (e, age) => e.rrsp + e.tfsa + e.nonreg - tax(e.rrsp, 0, e.gain, age, 0);
+  /* Turns a list of properties ({ name, rent, sale, year }) into per-year totals, indexed from year0.
+     A property with no sale year is kept for the whole plan. Rent stops in the year a property is sold. */
+  function propertyPlan(list, year0) {
+    const N = 130, rentByYear = new Float64Array(N), saleByYear = new Float64Array(N), saleNotes = {};
+    for (const q of list || []) {
+      const at = q.year == null ? Infinity : Math.max(0, q.year - year0);
+      for (let i = 0; i < N && i < at; i++) rentByYear[i] += q.rent || 0;
+      if (at < N && q.sale > 0) { saleByYear[at] += q.sale; (saleNotes[at] = saleNotes[at] || []).push({ name: q.name, amount: q.sale }); }
+    }
+    return { rentByYear, saleByYear, saleNotes };
+  }
   const drawStartIndex = p => Math.max(0, p.people[0].retireAge - p.people[0].age, p.people[1].retireAge - p.people[1].age);
   const yearCount = p => p.endAge - Math.min(p.people[0].age, p.people[1].age) + 1;
 
@@ -686,7 +704,7 @@ const Engine = (() => {
     return Math.floor(lo / 500) * 500;
   }
 
-  return { tax, healthPremium, rrifFactor, cppAnnual, oasAnnual, run, deterministic, monteCarlo, compareOrders, ORDERS,
+  return { tax, healthPremium, rrifFactor, cppAnnual, oasAnnual, run, deterministic, monteCarlo, compareOrders, ORDERS, propertyPlan,
     sustainableSpending, realRate, drawStartIndex, yearCount, CPP_MAX_MONTHLY, OAS_MONTHLY, OAS_THRESHOLD };
 })();
 
@@ -698,9 +716,9 @@ const Engine = (() => {
   const NEAR_YEARS = 15, NEAR_SHARE = 2 / 3;   // the savings chart gives the next 15 years two thirds of its width
   const PERSON_A = { age: 45, retire: 63, rrsp: 250000, tfsa: 90000, cRrsp: 12000, cTfsa: 7000, cpp: 1100, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
   const PERSON_B = { age: 43, retire: 61, rrsp: 180000, tfsa: 70000, cRrsp: 8000, cTfsa: 5000, cpp: 850, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
-  const EXAMPLE = { mode: 'joint', a: PERSON_A, b: PERSON_B, end: 95, nonreg: 40000, cNonreg: 0, spend: 85000, rent: 0, sale: 0, saleYear: Y0 + 10, rentStops: true, ret: 5.5, infl: 2.1, vol: 10, strategy: 'auto' };
+  const EXAMPLE = { mode: 'joint', a: PERSON_A, b: PERSON_B, end: 95, nonreg: 40000, cNonreg: 0, spend: 85000, properties: [{ name: 'Property 1', rent: 0, sale: 0, year: null }], ret: 5.5, infl: 2.1, vol: 10, strategy: 'auto' };
   const PF = { age: 'age', retire: 'retire', rrsp: 'rrsp', tfsa: 'tfsa', cRrsp: 'c-rrsp', cTfsa: 'c-tfsa', cpp: 'cpp', cppAge: 'cpp-age', oasAge: 'oas-age', oasYears: 'oas-years', db: 'db', dbAge: 'db-age' };
-  const SF = { end: 'in-end', nonreg: 'in-nonreg', cNonreg: 'in-c-nonreg', spend: 'in-spend', rent: 'in-rent', sale: 'in-sale', saleYear: 'in-sale-year', ret: 'in-ret', infl: 'in-infl', vol: 'in-vol' };
+  const SF = { end: 'in-end', nonreg: 'in-nonreg', cNonreg: 'in-c-nonreg', spend: 'in-spend', ret: 'in-ret', infl: 'in-infl', vol: 'in-vol' };
   const SERIES = [
     { key: 'cpp', label: 'CPP', color: 'var(--s-cpp)' },
     { key: 'oas', label: 'OAS', color: 'var(--s-oas)' },
@@ -741,6 +759,42 @@ const Engine = (() => {
     for (let a = from; a <= 70; a++) $(who + '-' + key).appendChild(new Option('Age ' + a, a));
   }
 
+  /* Properties are a list the user can add to and remove from, so their fields are built here rather than in the HTML. */
+  const MAX_PROPS = 8;
+  function drawProps(list) {
+    const host = $('props'); host.replaceChildren();
+    list.forEach((q, j) => {
+      const card = el('div', 'prop'), head = el('div', 'prop-head');
+      const name = el('input', 'prop-name'); name.type = 'text'; name.maxLength = 30; name.value = q.name || 'Property ' + (j + 1);
+      name.dataset.k = 'name'; name.setAttribute('aria-label', 'Property name');
+      const rm = el('button', 'prop-remove', 'Remove'); rm.type = 'button'; rm.setAttribute('aria-label', 'Remove ' + name.value);
+      rm.addEventListener('click', () => { const cur = readProps(); cur.splice(j, 1); drawProps(cur); $('example-note').hidden = true; recalc(); });
+      head.append(name, rm);
+      const field = (label, k, wide) => {
+        const f = el('div', 'field' + (wide ? ' wide' : '')), id = 'prop-' + j + '-' + k;
+        const lb = el('label', null, label); lb.htmlFor = id;
+        const c = el('div', 'control'), inp = el('input'); inp.id = id; inp.dataset.k = k; inp.inputMode = 'numeric';
+        if (k === 'year') { inp.type = 'number'; inp.min = Y0; inp.max = Y0 + 90; inp.step = 1; inp.placeholder = 'Not selling'; inp.value = q.year == null ? '' : q.year; }
+        else { c.appendChild(el('span', 'affix', '$')); inp.type = 'text'; inp.setAttribute('data-money', ''); inp.setAttribute('step', k === 'rent' ? '1000' : '10000'); inp.value = commas(q[k] || 0); }
+        c.appendChild(inp); f.append(lb, c); return f;
+      };
+      const warn = el('p', 'prop-warn', 'Add the year sold to count this sale.'); warn.hidden = true;
+      card.append(head, field('Rent per year, after expenses', 'rent', true), field('Cash from sale', 'sale'), field('Year sold', 'year'), warn);
+      host.appendChild(card);
+    });
+    $('add-prop').hidden = list.length >= MAX_PROPS;
+  }
+  function readProps() {
+    return [...document.querySelectorAll('#props .prop')].map((card, j) => {
+      const get = k => card.querySelector('[data-k="' + k + '"]').value;
+      const amount = k => { const n = parseFloat(raw(get(k))); return Number.isFinite(n) ? Math.max(0, n) : 0; };
+      const y = parseInt(get('year'), 10), sale = amount('sale');
+      const year = Number.isFinite(y) && y >= 1000 ? clamp(y, Y0, Y0 + 90) : null;   // ignore a year that is still being typed
+      card.querySelector('.prop-warn').hidden = !(sale > 0 && year == null);
+      return { name: get('name').trim() || 'Property ' + (j + 1), rent: amount('rent'), sale, year };
+    });
+  }
+
   function fill(v) {
     for (const who of ['a', 'b']) {
       for (const k in PF) setVal(who + '-' + PF[k], v[who][k]);
@@ -748,7 +802,7 @@ const Engine = (() => {
     }
     for (const k in SF) setVal(SF[k], v[k]);
     $('in-strategy').value = v.strategy;
-    $('in-rent-stops').checked = v.rentStops !== false;
+    drawProps(v.properties);
     $('in-spend-range').value = v.spend;
     $('mode-' + v.mode).checked = true;
   }
@@ -773,9 +827,8 @@ const Engine = (() => {
     const inPlan = v.mode === 'joint' ? [v.a, v.b] : [v[v.mode]];
     const young = Math.min(...inPlan.map(q => q.age)), gap = Math.max(...inPlan.map(q => q.retire - q.age));
     v.end = clamp(Math.round(v.end), Math.max(young + gap + 1, 70), 110);
-    for (const k of ['nonreg', 'cNonreg', 'spend', 'rent', 'sale']) v[k] = Math.max(0, v[k]);
-    v.saleYear = clamp(Math.round(v.saleYear), Y0, Y0 + 90);
-    v.rentStops = $('in-rent-stops').checked;
+    for (const k of ['nonreg', 'cNonreg', 'spend']) v[k] = Math.max(0, v[k]);
+    v.properties = readProps();
     v.ret = clamp(v.ret, 0, 12); v.infl = clamp(v.infl, 0, 8); v.vol = clamp(v.vol, 0, 25);
     last = v;
     return v;
@@ -785,7 +838,7 @@ const Engine = (() => {
   const empty = q => Object.assign({}, q, { rrsp: 0, tfsa: 0, cRrsp: 0, cTfsa: 0, cpp65: 0, oasYears: 0, dbAmount: 0 });
   const people = v => { if (v.mode === 'joint') return [person(v.a), person(v.b)]; const q = person(v[v.mode]); return [q, empty(q)]; };
   const toParams = v => ({ people: people(v), single: v.mode !== 'joint', nonreg: v.nonreg, cNonreg: v.cNonreg, endAge: v.end, spending: v.spend,
-    rent: v.rent, sale: v.sale, saleIndex: v.saleYear - Y0, rentStops: v.rentStops,
+    ...Engine.propertyPlan(v.properties, Y0),
     ret: v.ret / 100, vol: v.vol / 100, inflation: v.infl / 100, strategy: v.strategy });
   const ages = (p, i) => p.single ? `age ${p.people[0].age + i}` : `ages ${p.people[0].age + i} and ${p.people[1].age + i}`;
   let mode = 'joint';
@@ -909,7 +962,7 @@ const Engine = (() => {
         tipRow(t, 'Median', fmt(b[2][i]), 'var(--accent)');
         tipRow(t, 'Worse than 3 in 4', fmt(b[1][i]));
         tipRow(t, 'Worst 1 in 10', fmt(b[0][i]));
-        if (p.sale > 0 && i === p.saleIndex) { t.appendChild(el('div', 'rule')); tipRow(t, 'Sale proceeds added', fmt(p.sale)); }
+        if (p.saleNotes[i]) { t.appendChild(el('div', 'rule')); for (const n of p.saleNotes[i]) tipRow(t, 'Sold: ' + n.name, fmt(n.amount)); }
       });
     };
     hit.addEventListener('pointermove', move); hit.addEventListener('pointerdown', move);
@@ -1111,11 +1164,25 @@ const Engine = (() => {
     t.dispatchEvent(new Event('input', { bubbles: true }));
   });
   for (const id of ['mode-joint', 'mode-a', 'mode-b']) $(id).addEventListener('change', recalc);
+  $('add-prop').addEventListener('click', () => {
+    const cur = readProps();
+    let n = cur.length + 1; while (cur.some(q => q.name === 'Property ' + n)) n++;
+    cur.push({ name: 'Property ' + n, rent: 0, sale: 0, year: null });
+    drawProps(cur); $('example-note').hidden = true;
+    $('prop-' + (cur.length - 1) + '-rent').focus();
+    recalc();
+  });
   $('reset').addEventListener('click', () => { fill(EXAMPLE); last = clone(EXAMPLE); spendBy = Object.assign({}, SPEND); applyMode('joint'); $('example-note').hidden = false; try { localStorage.removeItem(STORE); } catch (e) {} recalc(); });
 
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) {}
   if (saved && saved.a && saved.b) { last = Object.assign(clone(EXAMPLE), saved, { mode: COPY[saved.mode] ? saved.mode : 'joint', a: Object.assign({}, PERSON_A, saved.a), b: Object.assign({}, PERSON_B, saved.b) }); spendBy = Object.assign({}, SPEND, saved.spendBy);
+    if (!Array.isArray(saved.properties)) {
+      const rent = +saved.rent || 0, sale = +saved.sale || 0, year = sale > 0 && saved.saleYear ? saved.saleYear : null;
+      last.properties = rent > 0 && sale > 0 && saved.rentStops === false
+        ? [{ name: 'Rental', rent, sale: 0, year: null }, { name: 'Property sale', rent: 0, sale, year }]
+        : [{ name: 'Property 1', rent, sale, year }];
+    }
     if (saved.orderV !== 2 || !(last.strategy === 'auto' || ORDER_NAMES[last.strategy])) last.strategy = 'auto';
     if (ORDER_NAMES[saved.autoPick]) autoPick = saved.autoPick;
     fill(last); applyMode(last.mode); $('example-note').hidden = true; }
