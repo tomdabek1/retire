@@ -52,12 +52,13 @@
 }
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; }
-.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 56px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 14px 56px; }
 h1 { font-family: var(--display); font-weight: 700; font-size: clamp(1.7rem, 3.4vw, 2.3rem); line-height: 1.1; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
 h2 { font-size: 1.05rem; font-weight: 600; margin: 0; text-wrap: balance; }
 p { margin: 0; }
-.masthead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; margin-bottom: 16px; }
-.scenario { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 20px; }
+.masthead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; margin-bottom: 10px; }
+.topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px; margin-bottom: 14px; }
+.scenario { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .scenario > span { font-weight: 600; font-size: 0.78rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); }
 .segments { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 9px; }
 .segments label { position: relative; cursor: pointer; }
@@ -96,9 +97,11 @@ dl { margin: 0; }
 /* Inputs */
 .inputs form { display: grid; gap: 0; padding: 0; }
 .example-note { font-size: 0.86rem; color: var(--ink-2); background: var(--accent-soft); border-radius: 10px 10px 0 0; padding: 10px 20px; }
-fieldset { border: 0; border-top: 1px solid var(--line); margin: 0; padding: 14px 20px 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; min-width: 0; }
+fieldset { border: 0; border-top: 1px solid var(--line); margin: 0; padding: 11px 20px 13px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 12px; min-width: 0; }
+.row3 { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px 10px; }
+.row3 .field { align-content: end; }
 .example-note + fieldset { border-top: 0; }
-legend { font-weight: 600; font-size: 0.78rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); padding: 0; margin-bottom: 8px; float: left; width: 100%; grid-column: 1 / -1; }
+legend { font-weight: 600; font-size: 0.78rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); padding: 0; margin-bottom: 4px; float: left; width: 100%; grid-column: 1 / -1; }
 .field { display: grid; gap: 3px; min-width: 0; align-content: start; }
 .field.wide { grid-column: 1 / -1; }
 .who { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; font-weight: 600; font-size: 0.86rem; }
@@ -114,7 +117,7 @@ fieldset > .hint { grid-column: 1 / -1; }
 .affix.end { padding: 0 9px 0 0; }
 .control input, .control select { flex: 1; min-width: 0; width: 100%; border: 0; background: transparent; color: var(--ink); font: inherit; font-variant-numeric: tabular-nums; padding: 7px 9px; outline: none; }
 .control select { padding-right: 4px; }
-.hint { font-size: 0.78rem; color: var(--muted); }
+.hint { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
 input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 0; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 0.86rem; color: var(--ink-2); grid-column: 1 / -1; }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }
@@ -124,7 +127,6 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Budget tab */
-.tabs { margin-bottom: 16px; }
 .budget { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); grid-template-areas: "form summary"; gap: 20px 24px; align-items: start; }
 .b-form { grid-area: form; padding: 0; }
 .b-summary { grid-area: summary; position: sticky; top: 16px; }
@@ -252,19 +254,18 @@ details summary { cursor: pointer; font-weight: 600; }
     <p>Ontario, 2026 tax rules. Every figure is in today's dollars.</p>
   </header>
 
-  <div class="tabs">
+  <div class="topbar">
     <div class="segments" role="radiogroup" aria-label="View">
       <label><input type="radio" name="view" id="tab-plan" value="plan" checked><span>Simulator</span></label>
       <label><input type="radio" name="view" id="tab-budget" value="budget"><span>Budget</span></label>
     </div>
-  </div>
-
-  <div class="scenario">
-    <span id="scenario-label">Scenario</span>
-    <div class="segments" role="radiogroup" aria-labelledby="scenario-label">
-      <label><input type="radio" name="mode" id="mode-joint" value="joint" checked><span>Both</span></label>
-      <label><input type="radio" name="mode" id="mode-a" value="a"><span>Self</span></label>
-      <label><input type="radio" name="mode" id="mode-b" value="b"><span>Spouse</span></label>
+    <div class="scenario">
+      <span id="scenario-label">Scenario</span>
+      <div class="segments" role="radiogroup" aria-labelledby="scenario-label">
+        <label><input type="radio" name="mode" id="mode-joint" value="joint" checked><span>Both</span></label>
+        <label><input type="radio" name="mode" id="mode-a" value="a"><span>Self</span></label>
+        <label><input type="radio" name="mode" id="mode-b" value="b"><span>Spouse</span></label>
+      </div>
     </div>
   </div>
 
@@ -297,8 +298,17 @@ details summary { cursor: pointer; font-weight: 600; }
           <div class="pair"><span class="pair-label">Retirement age</span>
             <div class="control"><input id="a-retire" aria-label="Retirement age, you" type="number" inputmode="numeric" min="40" max="75" step="1"></div>
             <div class="control"><input id="b-retire" aria-label="Retirement age, your wife" type="number" inputmode="numeric" min="40" max="75" step="1"></div></div>
-          <p class="hint" id="hint-stagger">Savings are drawn from the year you have both retired. Until then, the one still working is assumed to cover your spending.</p>
+          <p class="hint" id="hint-stagger">Savings are drawn once you have both retired; until then the one still working covers your spending.</p>
           <div class="field wide"><label for="in-end" id="lb-end">Plan until the younger of you is</label><div class="control"><input id="in-end" type="number" inputmode="numeric" min="70" max="110" step="1"></div></div>
+        </fieldset>
+        <fieldset>
+          <legend>Markets</legend>
+          <div class="row3">
+            <div class="field"><label for="in-ret">Return</label><div class="control"><input id="in-ret" type="number" inputmode="decimal" min="0" max="12" step="0.1"><span class="affix end">%</span></div></div>
+            <div class="field"><label for="in-infl">Inflation</label><div class="control"><input id="in-infl" type="number" inputmode="decimal" min="0" max="8" step="0.1"><span class="affix end">%</span></div></div>
+            <div class="field"><label for="in-vol">Yearly swing</label><div class="control"><input id="in-vol" type="number" inputmode="decimal" min="0" max="25" step="0.5"><span class="affix end">%</span></div></div>
+          </div>
+          <p class="hint">Return is the yearly average you expect before inflation. Swing: about 6% for mostly bonds, 10% for a balanced mix, 15% for all stocks.</p>
         </fieldset>
         <fieldset>
           <legend>Savings today</legend>
@@ -366,12 +376,6 @@ details summary { cursor: pointer; font-weight: 600; }
           <p class="hint">For each property, enter the rent each of you keeps per year, after expenses and before income tax. If you plan to sell it, add the year and how much of the cash goes into each account, after commissions and tax and in today's dollars. Rent stops the year it is sold. RRSP and TFSA room is not checked, so enter only what you have room for.</p>
           <div class="props" id="props"></div>
           <div class="field wide"><button type="button" id="add-prop">Add a property</button></div>
-        </fieldset>
-        <fieldset>
-          <legend>Markets</legend>
-          <div class="field"><label for="in-ret">Expected return</label><div class="control"><input id="in-ret" type="number" inputmode="decimal" min="0" max="12" step="0.1"><span class="affix end">%</span></div></div>
-          <div class="field"><label for="in-infl">Inflation</label><div class="control"><input id="in-infl" type="number" inputmode="decimal" min="0" max="8" step="0.1"><span class="affix end">%</span></div></div>
-          <div class="field wide"><label for="in-vol">Year-to-year swing in returns</label><div class="control"><input id="in-vol" type="number" inputmode="decimal" min="0" max="25" step="0.5"><span class="affix end">%</span></div><p class="hint">About 6% for mostly bonds, 10% for a balanced mix, 15% for all stocks.</p></div>
         </fieldset>
         <fieldset>
           <legend>Withdrawal order</legend>
