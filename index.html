@@ -486,7 +486,7 @@ details summary { cursor: pointer; font-weight: 600; }
           <summary>What this simulator assumes</summary>
           <ul>
             <li>Everyone lives in Ontario. A joint scenario taxes each spouse on their own income; an individual scenario models one person on their own, with that person's accounts, their side of each property and its own spending figure. Tax uses the 2026 federal and Ontario brackets, the basic, age and pension income credits, the Ontario surtax and health premium, and the OAS recovery tax on income above $95,323. Brackets are assumed to keep pace with inflation.</li>
-            <li>Each simulated year draws a return at random around your expected return, using the swing you set. All invested accounts earn the same return. Uninvested cash earns 2% a year, does not move with the markets, and is spent first. Its interest is not taxed in the model.</li>
+            <li>Each simulated year draws a return at random around your expected return, using the swing you set. All invested accounts earn the same return. Uninvested cash earns no interest, so it loses value to inflation, and it is spent first. Spending it triggers no tax.</li>
             <li>In a joint scenario, pension income splitting is applied whenever it lowers your combined tax: up to half of workplace pension income at any age, and of RRSP or RRIF income from 65, moves to the lower-income spouse. RRSP withdrawals are drawn from whichever of you has the lower income first.</li>
             <li>In a joint scenario, savings are drawn from the year you have both retired. Before that, the model assumes the spouse still working covers your spending, and it ignores any CPP, OAS or pension the retired spouse receives.</li>
             <li>CPP is reduced 0.6% for each month it starts before 65 and raised 0.7% for each month after. OAS is $762.50 a month at 65 (October to December 2026), rises 0.6% for each month deferred, and rises 10% at 75.</li>
@@ -592,7 +592,7 @@ const Engine = (() => {
     return fed + on + claw;
   }
 
-  const CASH_RATE = 0.02;   // nominal interest on uninvested cash
+  const CASH_RATE = 0;   // nominal interest on uninvested cash: none, so it loses ground to inflation
   function cppAnnual(p) {
     const months = (p.cppAge - 65) * 12;
     const adj = months < 0 ? 1 + 0.006 * months : 1 + 0.007 * months;
