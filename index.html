@@ -316,7 +316,15 @@ details summary { cursor: pointer; font-weight: 600; }
             <div class="field"><label for="in-infl">Inflation</label><div class="control"><input id="in-infl" type="number" inputmode="decimal" min="0" max="8" step="0.1"><span class="affix end">%</span></div></div>
             <div class="field"><label for="in-vol">Yearly swing</label><div class="control"><input id="in-vol" type="number" inputmode="decimal" min="0" max="25" step="0.5"><span class="affix end">%</span></div></div>
           </div>
-          <p class="hint">Return is the yearly average you expect before inflation. Swing: about 6% for mostly bonds, 10% for a balanced mix, 15% for all stocks.</p>
+          <p class="hint">Return is the yearly average you expect before inflation. Swing is the ordinary year-to-year wobble, not the worst case: about 6% for mostly bonds, 10% for a balanced mix, 15% for all stocks. Use the crash test for a 2008-style year.</p>
+          <div class="field"><label for="in-crash-when">Crash test</label><div class="control"><select id="in-crash-when">
+            <option value="off">Off</option>
+            <option value="retire">Year we retire</option>
+            <option value="retire2">Third year of retirement</option>
+            <option value="now">This year</option>
+          </select></div></div>
+          <div class="field"><label for="in-crash-drop">Portfolio falls by</label><div class="control"><input id="in-crash-drop" type="number" inputmode="numeric" min="5" max="80" step="5"><span class="affix end">%</span></div></div>
+          <p class="hint" id="crash-hint" hidden></p>
         </fieldset>
         <fieldset>
           <legend>Savings today</legend>
@@ -481,6 +489,7 @@ details summary { cursor: pointer; font-weight: 600; }
             <li>In a joint scenario, savings are drawn from the year you have both retired. Before that, the model assumes the spouse still working covers your spending, and it ignores any CPP, OAS or pension the retired spouse receives.</li>
             <li>CPP is reduced 0.6% for each month it starts before 65 and raised 0.7% for each month after. OAS is $762.50 a month at 65 (October to December 2026), rises 0.6% for each month deferred, and rises 10% at 75.</li>
             <li>Budget lines with an "until age" stop once the younger of you reaches that age, and the simulator's spending falls by that amount from then on. The down-year rule looks at the previous year's return before inflation: if the portfolio fell by at least the chosen percentage, that year's travel budget is skipped and the chosen share of it is spent at home, so spending drops by the rest. It applies only to the travel line and only while that line is in the budget.</li>
+            <li>The crash test forces the chosen fall, before inflation, into one year on every simulated path, replacing that year's random return. Everything else about the paths is unchanged, so the headline compares the same 1,000 futures with and without the crash.</li>
             <li>Automatic tests the three withdrawal orders on the same 1,000 market paths and uses the one with the best chance your money lasts. Orders within half a percentage point of the best are treated as tied, and the tie goes to the one that leaves the most after tax, counting any RRSP still remaining as taxed all at once in the final year. It only chooses between these three orders, so it is not a full tax plan.</li>
             <li>RRIF minimum withdrawals start at 71 using the CRA percentages. Cash you are forced to withdraw but don't need goes to your TFSAs (up to $7,000 a year each), then to non-registered savings.</li>
             <li>Non-registered growth is taxed as a capital gain when you sell, at 50% inclusion. Each person's cost base starts at today's balance, and withdrawals come from each of you in proportion to your non-registered balances.</li>
@@ -789,11 +798,13 @@ const Engine = (() => {
   }
 
   const realRate = p => (1 + p.ret) / (1 + p.inflation) - 1;
+  /* Crash test: in the chosen year the portfolio falls by p.crash.drop (before inflation) on every path. */
+  const withCrash = (p, rr) => p.crash ? i => (i === p.crash.index ? (1 - p.crash.drop) / (1 + p.inflation) - 1 : rr(i)) : rr;
 
   function deterministic(p) {
     const rows = [];
-    const rr = realRate(p);
-    const failedAt = run(p, () => rr, null, rows);
+    const rr = withCrash(p, () => realRate(p));
+    const failedAt = run(p, rr, null, rows);
     return { rows, failedAt };
   }
 
@@ -808,11 +819,11 @@ const Engine = (() => {
     let ruleYears = 0;
     for (let k = 0; k < paths; k++) {
       const off = k * sh.years;
-      const f = run(p, i => {
+      const f = run(p, withCrash(p, i => {
         const nominal = Math.max(-0.6, p.ret + p.vol * sh.z[off + i]);
         return (1 + nominal) / (1 + p.inflation) - 1;
-      }, totals, null, endOut);
-      if (p.rule && wantBands) { const ds = drawStartIndex(p); for (let i = ds + 1; i < years; i++) { const nom = Math.max(-0.6, p.ret + p.vol * sh.z[off + i - 1]); if (nom <= -p.rule.drop && p.rule.travel[i] > 0) ruleYears++; } }
+      }), totals, null, endOut);
+      if (p.rule && wantBands) { const ds = drawStartIndex(p); for (let i = ds + 1; i < years; i++) { const nom = p.crash && i - 1 === p.crash.index ? -p.crash.drop : Math.max(-0.6, p.ret + p.vol * sh.z[off + i - 1]); if (nom <= -p.rule.drop && p.rule.travel[i] > 0) ruleYears++; } }
       if (wantEstate) estates[k] = afterTax(endOut, p.endAge);
       if (f >= 0) failAges.push(f); else ok++;
       if (wantBands) for (let i = 0; i < years; i++) all[i][k] = totals[i];
@@ -876,9 +887,9 @@ const Engine = (() => {
   const blankProp = name => ({ name, year: null, a: blankSide(), b: blankSide() });
   const PERSON_A = { age: 45, retire: 63, rrsp: 250000, tfsa: 90000, nonreg: 20000, cRrsp: 12000, cTfsa: 7000, cNonreg: 0, cpp: 1100, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
   const PERSON_B = { age: 43, retire: 61, rrsp: 180000, tfsa: 70000, nonreg: 20000, cRrsp: 8000, cTfsa: 5000, cNonreg: 0, cpp: 850, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
-  const EXAMPLE = { mode: 'joint', a: PERSON_A, b: PERSON_B, end: 95, spend: 85000, properties: [blankProp('Property 1')], ret: 5.5, infl: 2.1, vol: 10, strategy: 'auto' };
+  const EXAMPLE = { mode: 'joint', a: PERSON_A, b: PERSON_B, end: 95, spend: 85000, properties: [blankProp('Property 1')], ret: 5.5, infl: 2.1, vol: 10, strategy: 'auto', crashWhen: 'off', crashDrop: 35 };
   const PF = { age: 'age', retire: 'retire', rrsp: 'rrsp', tfsa: 'tfsa', nonreg: 'nonreg', cRrsp: 'c-rrsp', cTfsa: 'c-tfsa', cNonreg: 'c-nonreg', cpp: 'cpp', cppAge: 'cpp-age', oasAge: 'oas-age', oasYears: 'oas-years', db: 'db', dbAge: 'db-age' };
-  const SF = { end: 'in-end', spend: 'in-spend', ret: 'in-ret', infl: 'in-infl', vol: 'in-vol' };
+  const SF = { end: 'in-end', spend: 'in-spend', ret: 'in-ret', infl: 'in-infl', vol: 'in-vol', crashDrop: 'in-crash-drop' };
   const SERIES = [
     { key: 'cpp', label: 'CPP', color: 'var(--s-cpp)' },
     { key: 'oas', label: 'OAS', color: 'var(--s-oas)' },
@@ -990,6 +1001,7 @@ const Engine = (() => {
     }
     for (const k in SF) setVal(SF[k], v[k]);
     $('in-strategy').value = v.strategy;
+    $('in-crash-when').value = v.crashWhen || 'off';
     drawProps(v.properties);
     $('in-spend-range').value = v.spend;
     $('mode-' + v.mode).checked = true;
@@ -1012,6 +1024,7 @@ const Engine = (() => {
     }
     for (const k in SF) v[k] = num(SF[k], last[k]);
     v.strategy = $('in-strategy').value;
+    v.crashWhen = $('in-crash-when').value; v.crashDrop = clamp(v.crashDrop, 5, 80);
     const inPlan = v.mode === 'joint' ? [v.a, v.b] : [v[v.mode]];
     const young = Math.min(...inPlan.map(q => q.age)), gap = Math.max(...inPlan.map(q => q.retire - q.age));
     v.end = clamp(Math.round(v.end), Math.max(young + gap + 1, 70), 110);
@@ -1028,7 +1041,14 @@ const Engine = (() => {
   const toParams = v => ({ people: people(v), single: v.mode !== 'joint', endAge: v.end, spending: v.spend,
     ...budgetSchedule(v.mode === 'joint' ? Math.min(v.a.age, v.b.age) : v[v.mode].age),
     ...Engine.propertyPlan(v.properties, Y0, v.mode),
-    ret: v.ret / 100, vol: v.vol / 100, inflation: v.infl / 100, strategy: v.strategy });
+    ret: v.ret / 100, vol: v.vol / 100, inflation: v.infl / 100, strategy: v.strategy, crash: crashParams(v) });
+  /* Which year index the crash test hits: the return earned during that year. */
+  function crashParams(v) {
+    if (!v.crashWhen || v.crashWhen === 'off') return null;
+    const ps = people(v), start = Math.max(0, ps[0].retireAge - ps[0].age, ps[1].retireAge - ps[1].age);
+    const index = v.crashWhen === 'now' ? 0 : v.crashWhen === 'retire2' ? start + 2 : start;
+    return { drop: v.crashDrop / 100, index };
+  }
   const ages = (p, i) => p.single ? `age ${p.people[0].age + i}` : `ages ${p.people[0].age + i} and ${p.people[1].age + i}`;
   let mode = 'joint';
   const SPEND = { joint: 85000, a: 50000, b: 38000 };   // each scenario keeps its own spending figure
@@ -1274,7 +1294,10 @@ const Engine = (() => {
     $('odds-label').textContent = mode === 'a' ? `chance your money lasts until you are ${endA}` : mode === 'b' ? `chance your spouse's money lasts until they are ${endA}`
       : `chance your money lasts until you are ${endA} and your spouse is ${p.people[1].age + n - 1}`;
     const detail = (p.spendCut ? ', less once budget lines end' : '') + (p.rule ? ', less in years after a market fall' : '');
+    $('crash-hint').hidden = !p.crash;
+    if (p.crash) $('crash-hint').textContent = 'Every path has the portfolio fall ' + Math.round(p.crash.drop * 100) + '% in ' + (Y0 + p.crash.index) + ', on top of its ordinary ups and downs.';
     let text = `${ok.toLocaleString('en-CA')} of ${PATHS.toLocaleString('en-CA')} simulated market paths paid ${fmt(p.spending)} a year after tax${detail}, through ${Y0 + n - 1}.`;
+    if (p.crash && mc.withoutCrash != null) text += ` That is with a ${Math.round(p.crash.drop * 100)}% crash forced in ${Y0 + p.crash.index}; without it the odds are ${Math.round(mc.withoutCrash * 100)}%.`;
     if (p.rule && mc.withoutRule != null) text += ` Without the down-year rule it would be ${Math.round(mc.withoutRule * 100)}%; the rule kicks in about ${mc.ruleYearsPerPath < 0.05 ? 'once in 20 retirements' : mc.ruleYearsPerPath.toFixed(1) + ' times per retirement'}.`;
     if (mc.medianFailIndex >= 0) text += ` In the paths that fell short, savings typically ran out around ${Y0 + mc.medianFailIndex}, at ${ages(p, mc.medianFailIndex)}.`;
     $('odds-text').textContent = text;
@@ -1469,6 +1492,7 @@ const Engine = (() => {
     /* Draw straight away with the order used last time, then test every order in the background and redraw if another one wins. */
     let p = Object.assign({}, base, { strategy: auto ? autoPick : v.strategy });
     let mc = Engine.monteCarlo(p, PATHS, true, true);
+    if (p.crash) mc.withoutCrash = Engine.monteCarlo(Object.assign({}, p, { crash: null }), PATHS, false).success;
     if (p.rule) mc.withoutRule = Engine.monteCarlo(Object.assign({}, p, { rule: null }), PATHS, false).success;
     render(p, mc);
     for (const id of ['st-safe', 'ages', 'orders', 'order-hint']) $(id).classList.add('pending');
@@ -1478,7 +1502,7 @@ const Engine = (() => {
       const cmp = Engine.compareOrders(base, PATHS, { strategy: p.strategy, mc });
       if (auto) {
         autoPick = cmp.best.strategy; save();
-        if (autoPick !== p.strategy) { p = cmp.best.p; mc = cmp.best.mc; if (p.rule) mc.withoutRule = Engine.monteCarlo(Object.assign({}, p, { rule: null }), PATHS, false).success; render(p, mc); }
+        if (autoPick !== p.strategy) { p = cmp.best.p; mc = cmp.best.mc; if (p.crash) mc.withoutCrash = Engine.monteCarlo(Object.assign({}, p, { crash: null }), PATHS, false).success; if (p.rule) mc.withoutRule = Engine.monteCarlo(Object.assign({}, p, { rule: null }), PATHS, false).success; render(p, mc); }
       }
       drawOrders(cmp, p.strategy, auto);
       $('orders').classList.remove('pending'); $('order-hint').classList.remove('pending');
@@ -1549,6 +1573,7 @@ const Engine = (() => {
   for (const id of ['fan-real', 'fan-nominal']) $(id).addEventListener('change', e => { fanNominal = e.target.value === 'nominal'; if (state) drawFan(state.p, state.mc); persist(); });
   for (const id of ['tab-plan', 'tab-budget']) $(id).addEventListener('change', e => { setView(e.target.value); persist(); });
   for (const id of ['mode-joint', 'mode-a', 'mode-b']) $(id).addEventListener('change', recalc);
+  $('in-crash-when').addEventListener('change', () => { $('example-note').hidden = true; recalc(); });
   $('add-prop').addEventListener('click', () => {
     const cur = readProps();
     let n = cur.length + 1; while (cur.some(q => q.name === 'Property ' + n)) n++;
