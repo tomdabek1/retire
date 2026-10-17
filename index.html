@@ -22,7 +22,7 @@
   --ink: #13201b; --ink-2: #48574f; --muted: #76847d;
   --line: #dde4e0; --line-strong: #c2ccc7;
   --accent: #1c6a58; --accent-soft: #dcebe6; --on-accent: #ffffff;
-  --s-cpp: #2a78d6; --s-oas: #eb6834; --s-db: #1baf7a; --s-rrsp: #eda100; --s-nonreg: #e87ba4; --s-tfsa: #008300; --s-rent: #8250d6;
+  --s-cpp: #2a78d6; --s-oas: #eb6834; --s-db: #1baf7a; --s-rrsp: #eda100; --s-nonreg: #e87ba4; --s-cash: #8a93a0; --s-tfsa: #008300; --s-rent: #8250d6;
   --good: #0ca30c; --warn: #fab219; --crit: #d03b3b;
   --shadow: 0 6px 24px rgba(19, 32, 27, 0.14);
   --display: "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif;
@@ -34,7 +34,7 @@
     --ink: #f1f5f3; --ink-2: #b7c3bd; --muted: #85928c;
     --line: #27312d; --line-strong: #3a4640;
     --accent: #5dbba3; --accent-soft: #1d2e29; --on-accent: #0e1412;
-    --s-cpp: #3987e5; --s-oas: #d95926; --s-db: #199e70; --s-rrsp: #c98500; --s-nonreg: #d55181; --s-tfsa: #008300; --s-rent: #9a70e8;
+    --s-cpp: #3987e5; --s-oas: #d95926; --s-db: #199e70; --s-rrsp: #c98500; --s-nonreg: #d55181; --s-cash: #8a93a0; --s-tfsa: #008300; --s-rent: #9a70e8;
     --good: #0ca30c; --warn: #fab219; --crit: #d03b3b;
     --shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
     color-scheme: dark;
@@ -45,7 +45,7 @@
   --ink: #f1f5f3; --ink-2: #b7c3bd; --muted: #85928c;
   --line: #27312d; --line-strong: #3a4640;
   --accent: #5dbba3; --accent-soft: #1d2e29; --on-accent: #0e1412;
-  --s-cpp: #3987e5; --s-oas: #d95926; --s-db: #199e70; --s-rrsp: #c98500; --s-nonreg: #d55181; --s-tfsa: #008300; --s-rent: #9a70e8;
+  --s-cpp: #3987e5; --s-oas: #d95926; --s-db: #199e70; --s-rrsp: #c98500; --s-nonreg: #d55181; --s-cash: #8a93a0; --s-tfsa: #008300; --s-rent: #9a70e8;
   --good: #0ca30c; --warn: #fab219; --crit: #d03b3b;
   --shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
   color-scheme: dark;
@@ -338,6 +338,9 @@ details summary { cursor: pointer; font-weight: 600; }
           <div class="pair"><span class="pair-label">Non-registered</span>
             <div class="control"><span class="affix">$</span><input id="a-nonreg" aria-label="Non-registered, you" type="text" data-money inputmode="numeric" step="5000"></div>
             <div class="control"><span class="affix">$</span><input id="b-nonreg" aria-label="Non-registered, your spouse" type="text" data-money inputmode="numeric" step="5000"></div></div>
+          <div class="pair"><span class="pair-label">Cash (not invested)</span>
+            <div class="control"><span class="affix">$</span><input id="a-cash" aria-label="Cash, you" type="text" data-money inputmode="numeric" step="5000"></div>
+            <div class="control"><span class="affix">$</span><input id="b-cash" aria-label="Cash, your spouse" type="text" data-money inputmode="numeric" step="5000"></div></div>
         </fieldset>
         <fieldset>
           <legend>Saved each year while working</legend>
@@ -483,7 +486,7 @@ details summary { cursor: pointer; font-weight: 600; }
           <summary>What this simulator assumes</summary>
           <ul>
             <li>Everyone lives in Ontario. A joint scenario taxes each spouse on their own income; an individual scenario models one person on their own, with that person's accounts, their side of each property and its own spending figure. Tax uses the 2026 federal and Ontario brackets, the basic, age and pension income credits, the Ontario surtax and health premium, and the OAS recovery tax on income above $95,323. Brackets are assumed to keep pace with inflation.</li>
-            <li>Each simulated year draws a return at random around your expected return, using the swing you set. All accounts earn the same return.</li>
+            <li>Each simulated year draws a return at random around your expected return, using the swing you set. All invested accounts earn the same return. Uninvested cash earns 2% a year, does not move with the markets, and is spent first. Its interest is not taxed in the model.</li>
             <li>In a joint scenario, pension income splitting is applied whenever it lowers your combined tax: up to half of workplace pension income at any age, and of RRSP or RRIF income from 65, moves to the lower-income spouse. RRSP withdrawals are drawn from whichever of you has the lower income first.</li>
             <li>In a joint scenario, savings are drawn from the year you have both retired. Before that, the model assumes the spouse still working covers your spending, and it ignores any CPP, OAS or pension the retired spouse receives.</li>
             <li>CPP is reduced 0.6% for each month it starts before 65 and raised 0.7% for each month after. OAS is $762.50 a month at 65 (October to December 2026), rises 0.6% for each month deferred, and rises 10% at 75.</li>
@@ -589,6 +592,7 @@ const Engine = (() => {
     return fed + on + claw;
   }
 
+  const CASH_RATE = 0.02;   // nominal interest on uninvested cash
   function cppAnnual(p) {
     const months = (p.cppAge - 65) * 12;
     const adj = months < 0 ? 1 + 0.006 * months : 1 + 0.007 * months;
@@ -608,13 +612,15 @@ const Engine = (() => {
     const A = p.people[0], B = p.people[1];
     let rA = A.rrsp, rB = B.rrsp, tfsa = A.tfsa + B.tfsa;
     let nA = A.nonreg || 0, nB = B.nonreg || 0, acbA = nA, acbB = nB;   // non-registered balance and cost base, per person
+    let cash = (A.cash || 0) + (B.cash || 0);   // uninvested cash, pooled; earns CASH_RATE and is spent first
+    const cr = (1 + CASH_RATE) / (1 + p.inflation) - 1;
     let dedA = 0, dedB = 0;   // RRSP deductions from sale cash that have not been used against income yet
     const infl = 1 + p.inflation;
     const cppA0 = cppAnnual(A), cppB0 = cppAnnual(B);
     const years = p.endAge - Math.min(A.age, B.age) + 1;
     const drawStart = drawStartIndex(p);
     let failedAt = -1;
-    let dR = 0, dA = 0, dB = 0, aN = 0, aNA = 0, aNB = 0, aT = 0, tA = 0, tB = 0, uA = 0, uB = 0;   // scratch set by alloc() and taxes()
+    let dR = 0, dA = 0, dB = 0, aC = 0, aN = 0, aNA = 0, aNB = 0, aT = 0, tA = 0, tB = 0, uA = 0, uB = 0;   // scratch set by alloc() and taxes()
     /* Property: each person's net rent is ordinary income, and after-tax sale cash lands in the chosen accounts
        at the start of the sale year. See propertyPlan(). */
     const S = p.sales, rentsA = p.rentA, rentsB = p.rentB;
@@ -627,19 +633,19 @@ const Engine = (() => {
         tfsa += S.t[i];
         nA += S.nA[i]; acbA += S.nA[i]; nB += S.nB[i]; acbB += S.nB[i];
       }
-      const startTotal = rA + rB + tfsa + nA + nB;
+      const startTotal = rA + rB + tfsa + nA + nB + cash;
       const sold = rows && S && S.any[i] ? S.rA[i] + S.rB[i] + S.t[i] + S.nA[i] + S.nB[i] : 0;
       if (totals) totals[i] = startTotal;
 
       if (i < drawStart) {
         const wA = ageA < A.retireAge, wB = ageB < B.retireAge;
         const cA = wA ? A.cNonreg || 0 : 0, cB = wB ? B.cNonreg || 0 : 0;
-        if (rows) rows.push({ i, ageA, ageB, phase: 'saving', start: startTotal, bal: [rA, rB, tfsa, nA, nB],
-          added: sold + (wA ? A.cRrsp + A.cTfsa : 0) + (wB ? B.cRrsp + B.cTfsa : 0) + cA + cB, out: 0, growth: startTotal * r });
+        if (rows) rows.push({ i, ageA, ageB, phase: 'saving', start: startTotal, bal: [rA, rB, tfsa, nA, nB, cash],
+          added: sold + (wA ? A.cRrsp + A.cTfsa : 0) + (wB ? B.cRrsp + B.cTfsa : 0) + cA + cB, out: 0, growth: (startTotal - cash) * r + cash * cr });
         rA = rA * (1 + r) + (wA ? A.cRrsp : 0);
         rB = rB * (1 + r) + (wB ? B.cRrsp : 0);
         tfsa = tfsa * (1 + r) + (wA ? A.cTfsa : 0) + (wB ? B.cTfsa : 0);
-        nA = nA * (1 + r) + cA; nB = nB * (1 + r) + cB;
+        nA = nA * (1 + r) + cA; nB = nB * (1 + r) + cB; cash *= 1 + cr;
         acbA = acbA / infl + cA; acbB = acbB / infl + cB;
         dedA /= infl; dedB /= infl;
         continue;
@@ -668,6 +674,7 @@ const Engine = (() => {
 
       const alloc = x => {
         let left = x; dR = 0; aN = 0; aT = 0;
+        aC = Math.min(left, cash); left -= aC;
         if (p.strategy !== 'taxable') { dR = Math.min(left, availR, firstCap); left -= dR; }
         aN = Math.min(left, nonreg); left -= aN;
         if (p.strategy === 'taxable') { const d = Math.min(left, availR); dR += d; left -= d; }
@@ -707,7 +714,7 @@ const Engine = (() => {
       };
       const cashIn = nA0 + nB0;
 
-      const maxDraw = availR + nonreg + tfsa;
+      const maxDraw = availR + nonreg + tfsa + cash;
       let t, net;
       alloc(0); t = taxes(); net = cashIn - t;
       if (net < target) {
@@ -728,31 +735,31 @@ const Engine = (() => {
       const surplus = Math.max(0, net - target);
       let row = null;
       if (rows) rows.push(row = { i, ageA, ageB, phase: 'retired', start: startTotal, cpp: cppA + cppB, oas: oasA + oasB, db: dbA + dbB, rent,
-        wR: minA + minB + dR, wN: aN, wT: aT, tax: t, taxA: tA, taxB: tB, net: Math.min(net, target), target, surplus, deducted: uA + uB,
-        bal: [rA, rB, tfsa, nA, nB], added: sold + surplus, out: minA + minB + dR + aN + aT, ruleHit });
+        wR: minA + minB + dR, wN: aN, wT: aT, wC: aC, tax: t, taxA: tA, taxB: tB, net: Math.min(net, target), target, surplus, deducted: uA + uB,
+        bal: [rA, rB, tfsa, nA, nB, cash], added: sold + surplus, out: minA + minB + dR + aN + aT + aC, ruleHit });
 
       rA -= minA + dA; rB -= minB + dB;
       if (aNA > 0) { acbA -= acbA * (aNA / nA); nA -= aNA; }
       if (aNB > 0) { acbB -= acbB * (aNB / nB); nB -= aNB; }
-      tfsa -= aT;
+      tfsa -= aT; cash -= aC;
       dedA -= uA; dedB -= uB;
       if (surplus > 0) {
         const toTfsa = Math.min(surplus, (p.single ? 1 : 2) * TFSA_LIMIT);
         const rest = surplus - toTfsa, toA = p.single ? rest : rest / 2;
         tfsa += toTfsa; nA += toA; acbA += toA; nB += rest - toA; acbB += rest - toA;
       }
-      if (row) row.growth = (Math.max(0, rA) + Math.max(0, rB) + Math.max(0, tfsa) + Math.max(0, nA) + Math.max(0, nB)) * r;
+      if (row) row.growth = (Math.max(0, rA) + Math.max(0, rB) + Math.max(0, tfsa) + Math.max(0, nA) + Math.max(0, nB)) * r + Math.max(0, cash) * cr;
       rA = Math.max(0, rA) * (1 + r); rB = Math.max(0, rB) * (1 + r);
-      tfsa = Math.max(0, tfsa) * (1 + r);
+      tfsa = Math.max(0, tfsa) * (1 + r); cash = Math.max(0, cash) * (1 + cr);
       nA = Math.max(0, nA) * (1 + r); nB = Math.max(0, nB) * (1 + r);
       acbA /= infl; acbB /= infl; dedA /= infl; dedB /= infl;
     }
-    if (endOut) { endOut.rrsp = rA + rB; endOut.tfsa = tfsa; endOut.nonreg = nA + nB; endOut.gain = Math.max(0, nA - acbA) + Math.max(0, nB - acbB); }
+    if (endOut) { endOut.rrsp = rA + rB; endOut.tfsa = tfsa; endOut.nonreg = nA + nB; endOut.cash = cash; endOut.gain = Math.max(0, nA - acbA) + Math.max(0, nB - acbB); }
     return failedAt;
   }
   /* What the final balances are worth after tax, if any remaining RRSP and unrealized gains
      all landed on one tax return in the final year. */
-  const afterTax = (e, age) => e.rrsp + e.tfsa + e.nonreg - tax(e.rrsp, 0, e.gain, age, 0);
+  const afterTax = (e, age) => e.rrsp + e.tfsa + e.nonreg + e.cash - tax(e.rrsp, 0, e.gain, age, 0);
   /* Turns a list of properties into per-year amounts, indexed from year0. Each property is
      { name, year, a: { rent, nonreg, tfsa, rrsp }, b: { ... } }: each person's rent, and where their share of the
      sale cash goes. A property with no sale year is kept for the whole plan; rent stops in the year it is sold.
@@ -884,10 +891,10 @@ const Engine = (() => {
   const NEAR_YEARS = 15, NEAR_SHARE = 2 / 3;   // the savings chart gives the next 15 years two thirds of its width
   const blankSide = () => ({ rent: 0, nonreg: 0, tfsa: 0, rrsp: 0 });
   const blankProp = name => ({ name, year: null, a: blankSide(), b: blankSide() });
-  const PERSON_A = { age: 45, retire: 63, rrsp: 250000, tfsa: 90000, nonreg: 20000, cRrsp: 12000, cTfsa: 7000, cNonreg: 0, cpp: 1100, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
-  const PERSON_B = { age: 43, retire: 61, rrsp: 180000, tfsa: 70000, nonreg: 20000, cRrsp: 8000, cTfsa: 5000, cNonreg: 0, cpp: 850, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
+  const PERSON_A = { age: 45, retire: 63, rrsp: 250000, tfsa: 90000, nonreg: 20000, cash: 15000, cRrsp: 12000, cTfsa: 7000, cNonreg: 0, cpp: 1100, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
+  const PERSON_B = { age: 43, retire: 61, rrsp: 180000, tfsa: 70000, nonreg: 20000, cash: 10000, cRrsp: 8000, cTfsa: 5000, cNonreg: 0, cpp: 850, cppAge: 65, oasAge: 65, oasYears: 40, db: 0, dbAge: 65, dbIndexed: true };
   const EXAMPLE = { mode: 'joint', a: PERSON_A, b: PERSON_B, end: 95, spend: 85000, properties: [blankProp('Property 1')], ret: 5.5, infl: 2.1, vol: 10, strategy: 'auto', crashWhen: 'off', crashDrop: 35 };
-  const PF = { age: 'age', retire: 'retire', rrsp: 'rrsp', tfsa: 'tfsa', nonreg: 'nonreg', cRrsp: 'c-rrsp', cTfsa: 'c-tfsa', cNonreg: 'c-nonreg', cpp: 'cpp', cppAge: 'cpp-age', oasAge: 'oas-age', oasYears: 'oas-years', db: 'db', dbAge: 'db-age' };
+  const PF = { age: 'age', retire: 'retire', rrsp: 'rrsp', tfsa: 'tfsa', nonreg: 'nonreg', cash: 'cash', cRrsp: 'c-rrsp', cTfsa: 'c-tfsa', cNonreg: 'c-nonreg', cpp: 'cpp', cppAge: 'cpp-age', oasAge: 'oas-age', oasYears: 'oas-years', db: 'db', dbAge: 'db-age' };
   const SF = { end: 'in-end', spend: 'in-spend', ret: 'in-ret', infl: 'in-infl', vol: 'in-vol', crashDrop: 'in-crash-drop' };
   const SERIES = [
     { key: 'cpp', label: 'CPP', color: 'var(--s-cpp)' },
@@ -896,6 +903,7 @@ const Engine = (() => {
     { key: 'rent', label: 'Rental income', color: 'var(--s-rent)' },
     { key: 'wR', label: 'RRSP / RRIF', color: 'var(--s-rrsp)' },
     { key: 'wN', label: 'Non-registered', color: 'var(--s-nonreg)' },
+    { key: 'wC', label: 'Cash', color: 'var(--s-cash)' },
     { key: 'wT', label: 'TFSA', color: 'var(--s-tfsa)' }
   ];
   const ORDER_NAMES = { taxable: 'Non-registered, then RRSP, then TFSA', bracket: 'RRSP up to the lowest tax bracket, then the rest', rrsp: 'RRSP first, then non-registered, then TFSA' };
@@ -1016,7 +1024,7 @@ const Engine = (() => {
       q.dbIndexed = $(who + '-db-indexed').checked;
       q.age = clamp(Math.round(q.age), 18, 90);
       q.retire = clamp(Math.round(q.retire), q.age, Math.max(q.age, 75));
-      for (const k of ['rrsp', 'tfsa', 'nonreg', 'cRrsp', 'cTfsa', 'cNonreg', 'db']) q[k] = Math.max(0, q[k]);
+      for (const k of ['rrsp', 'tfsa', 'nonreg', 'cash', 'cRrsp', 'cTfsa', 'cNonreg', 'db']) q[k] = Math.max(0, q[k]);
       q.cpp = clamp(q.cpp, 0, Engine.CPP_MAX_MONTHLY);
       q.oasYears = clamp(q.oasYears, 0, 47);
       q.dbAge = clamp(Math.round(q.dbAge), 50, 75);
@@ -1033,9 +1041,9 @@ const Engine = (() => {
     last = v;
     return v;
   }
-  const person = q => ({ age: q.age, retireAge: q.retire, rrsp: q.rrsp, tfsa: q.tfsa, nonreg: q.nonreg, cRrsp: q.cRrsp, cTfsa: q.cTfsa, cNonreg: q.cNonreg, cpp65: q.cpp,
+  const person = q => ({ age: q.age, retireAge: q.retire, rrsp: q.rrsp, tfsa: q.tfsa, nonreg: q.nonreg, cash: q.cash, cRrsp: q.cRrsp, cTfsa: q.cTfsa, cNonreg: q.cNonreg, cpp65: q.cpp,
     cppAge: q.cppAge, oasAge: q.oasAge, oasYears: q.oasYears, dbAmount: q.db, dbAge: q.dbAge, dbIndexed: q.dbIndexed });
-  const empty = q => Object.assign({}, q, { rrsp: 0, tfsa: 0, nonreg: 0, cRrsp: 0, cTfsa: 0, cNonreg: 0, cpp65: 0, oasYears: 0, dbAmount: 0 });
+  const empty = q => Object.assign({}, q, { rrsp: 0, tfsa: 0, nonreg: 0, cash: 0, cRrsp: 0, cTfsa: 0, cNonreg: 0, cpp65: 0, oasYears: 0, dbAmount: 0 });
   const people = v => { if (v.mode === 'joint') return [person(v.a), person(v.b)]; const q = person(v[v.mode]); return [q, empty(q)]; };
   const toParams = v => ({ people: people(v), single: v.mode !== 'joint', endAge: v.end, spending: v.spend,
     ...budgetSchedule(v.mode === 'joint' ? Math.min(v.a.age, v.b.age) : v[v.mode].age),
@@ -1193,7 +1201,7 @@ const Engine = (() => {
     const used = SERIES.filter(sr => data.some(r => r[sr.key] > 0.5));
     const lg = $('inc-legend'); lg.replaceChildren();
     for (const sr of used) { const sp = el('span'), i = el('i'); i.style.background = sr.color; sp.append(i, document.createTextNode(sr.label)); lg.appendChild(sp); }
-    const gross = r => r.cpp + r.oas + r.db + r.rent + r.wR + r.wN + r.wT;
+    const gross = r => r.cpp + r.oas + r.db + r.rent + r.wR + r.wN + r.wT + r.wC;
     const yMax = Math.max(p.spending, ...data.map(gross), ...data.map(r => r.target)) * 1.04;
     const n = data.length;
     const f = frame(host, yMax, n, Y0 + data[0].i, true);
@@ -1247,8 +1255,8 @@ const Engine = (() => {
 
   /* Start-of-year balance of every account, with what went in, what came out and what the investments earned. */
   function drawBalances(p, rows) {
-    const cols = p.single ? [['RRSP', 0], ['TFSA', 2], ['Non-registered', 3]]
-      : [['RRSP, you', 0], ['RRSP, spouse', 1], ['TFSAs', 2], ['Non-reg., you', 3], ['Non-reg., spouse', 4]];
+    const cols = p.single ? [['RRSP', 0], ['TFSA', 2], ['Non-registered', 3], ['Cash', 5]]
+      : [['RRSP, you', 0], ['RRSP, spouse', 1], ['TFSAs', 2], ['Non-reg., you', 3], ['Non-reg., spouse', 4], ['Cash', 5]];
     const used = cols.filter(c => rows.some(r => r.bal[c[1]] > 0.5));
     const head = $('bal-head'); head.replaceChildren();
     for (const h of ['Year', ...used.map(c => c[0]), 'Total', 'Added', 'Taken out', 'Growth']) head.appendChild(el('th', null, h));
@@ -1265,7 +1273,7 @@ const Engine = (() => {
 
   function drawLedger(p, rows) {
     const data = rows.filter(r => r.phase === 'retired');
-    const short = { cpp: 'CPP', oas: 'OAS', db: 'Pensions', rent: 'Rent', wR: 'RRSP / RRIF', wN: 'Non-reg.', wT: 'TFSA' };
+    const short = { cpp: 'CPP', oas: 'OAS', db: 'Pensions', rent: 'Rent', wR: 'RRSP / RRIF', wN: 'Non-reg.', wT: 'TFSA', wC: 'Cash' };
     const used = SERIES.filter(sr => data.some(r => r[sr.key] > 0.5));
     const head = $('ledger-head'); head.replaceChildren();
     for (const h of ['Year', p.single ? 'Age' : 'Ages', 'Savings', ...used.map(sr => short[sr.key]), 'Tax', 'After tax']) head.appendChild(el('th', null, h));
@@ -1604,6 +1612,7 @@ const Engine = (() => {
       last.a.nonreg = last.b.nonreg = n / 2; last.a.cNonreg = last.b.cNonreg = c / 2;
     }
     delete last.nonreg; delete last.cNonreg;
+    for (const w of ['a', 'b']) if (!(+last[w].cash >= 0)) last[w].cash = 0;   // saved before the cash line existed
     if (saved.orderV !== 2 || !(last.strategy === 'auto' || ORDER_NAMES[last.strategy])) last.strategy = 'auto';
     if (ORDER_NAMES[saved.autoPick]) autoPick = saved.autoPick;
     fanNominal = saved.fanNominal === true;
