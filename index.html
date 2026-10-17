@@ -423,7 +423,6 @@ details summary { cursor: pointer; font-weight: 600; }
           <span><i class="line" style="background: var(--accent)"></i>Median path</span>
           <span><i style="background: var(--accent); opacity: 0.34"></i>Middle half of paths</span>
           <span><i style="background: var(--accent); opacity: 0.14"></i>8 of 10 paths</span>
-          <span id="fan-note" hidden><i class="dash"></i>Next 15 years shown wider</span>
         </div>
         <div class="plot" id="fan"></div>
       </section>
@@ -1083,8 +1082,14 @@ const Engine = (() => {
 
   /* ---------- charts ---------- */
   function niceTicks(max, n) {
-    const raw = Math.max(max, 1) / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), norm = raw / mag;
-    const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+    /* Smallest "round" step that reaches the data in at most n+2 intervals, so the top of the axis hugs the data. */
+    max = Math.max(max, 1);
+    const mag = Math.pow(10, Math.floor(Math.log10(max / (n + 2))));
+    let step = mag * 10;
+    for (let k = 0; k < 4; k++) for (const m of [1, 2, 2.5, 5]) {
+      const st = m * mag * Math.pow(10, k);
+      if (Math.ceil(max / st - 1e-9) <= n + 2 && st < step) step = st;
+    }
     const ticks = [];
     for (let v = 0; v < max + step - 1e-6; v += step) ticks.push(v);
     return ticks;
@@ -1147,8 +1152,7 @@ const Engine = (() => {
     $('fan-money-note').hidden = !fanNominal;
     $('fan-money-note').textContent = 'Showing what the balances would read in each year, with inflation at ' + (p.inflation * 100).toFixed(1).replace(/\.0$/, '') + '% a year. A dollar then buys less than a dollar today. Everything else on the page stays in today\'s dollars.';
     let yMax = 0; for (let i = 0; i < n; i++) yMax = Math.max(yMax, b[4][i]);
-    const f = frame(host, yMax, n, Y0, false, NEAR_YEARS);
-    $('fan-note').hidden = !f.focus;
+    const f = frame(host, yMax, n, Y0, false, 0);
     const pts = (arr, rev) => { const o = []; for (let i = 0; i < n; i++) { const j = rev ? n - 1 - i : i; o.push(f.x(j).toFixed(1) + ',' + f.y(arr[j]).toFixed(1)); } return o.join(' '); };
     const ri = Engine.drawStartIndex(p), rx = f.x(ri), ry = f.y(b[2][ri]);
     let s = `<svg viewBox="0 0 ${f.W} ${f.H}" height="${f.H}" role="img" aria-label="Savings by year: median path with the range of simulated outcomes">` + f.grid;
