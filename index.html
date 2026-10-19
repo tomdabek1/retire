@@ -173,6 +173,14 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .shared-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 14px; background: var(--accent-soft); border-color: transparent; padding: 12px 16px; }
 .shared-note p { margin: 0; font-size: 0.9rem; color: var(--ink); }
 .shared-note .actions-inline { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Rental summary tab */
+.rentals .panel { max-width: 980px; }
+.r-scroll { overflow-x: auto; margin-top: 4px; }
+.r-table { min-width: 640px; }
+.r-table th:first-child, .r-table td:first-child { text-align: left; }
+.r-table tfoot td { font-weight: 600; color: var(--ink); border-top: 2px solid var(--line-strong); }
+.r-table .linkish { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.b-bar .fill.neg { background: var(--crit); }
 /* Asset disposal tab */
 .d-form fieldset:first-of-type { border-top: 0; }
 .d-form .example-note { border-radius: 10px 10px 0 0; }
@@ -188,7 +196,7 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .d-table tr.key td:first-child { color: var(--ink); }
 .d-note { margin-top: 14px; }
 .d-saved { display: flex; gap: 8px; align-items: center; }
-.d-saved .control { flex: 1; }
+.d-saved .control { flex: 1 1 10em; max-width: 18em; }
 .d-saved button:disabled { opacity: 0.45; cursor: default; }
 .disposal .b-summary { position: static; }
 .d-rows { grid-column: 1 / -1; display: grid; gap: 6px; min-width: 0; }
@@ -308,6 +316,7 @@ details summary { cursor: pointer; font-weight: 600; }
       <label><input type="radio" name="view" id="tab-plan" value="plan" checked><span>Simulator</span></label>
       <label><input type="radio" name="view" id="tab-budget" value="budget"><span>Budget</span></label>
       <label><input type="radio" name="view" id="tab-disposal" value="disposal"><span>Asset disposal</span></label>
+      <label><input type="radio" name="view" id="tab-rentals" value="rentals"><span>Rental summary</span></label>
     </div>
     <button type="button" id="share-btn" title="Copy a link that opens this page with everything you have entered">Copy share link</button>
     <div class="scenario">
@@ -575,15 +584,29 @@ details summary { cursor: pointer; font-weight: 600; }
     </form>
   </div>
 
+
+  <div class="rentals" id="pane-rentals" hidden>
+    <section class="panel" aria-live="polite">
+      <div class="odds-label">Rental cash flow from all saved properties</div>
+      <div class="odds-num" id="r-month">$0</div>
+      <div class="odds-label">a month before income tax</div>
+      <p class="odds-text" id="r-year"></p>
+      <div class="b-bars" id="r-bars"></div>
+      <div class="r-scroll"><table class="d-table r-table" id="r-table"><thead></thead><tbody></tbody></table></div>
+      <p class="hint d-note" id="r-note"></p>
+    </section>
+  </div>
+
   <div class="budget disposal" id="pane-disposal" hidden>
     <form class="panel b-form d-form" id="disposal-form" autocomplete="off" novalidate>
       <p class="example-note" id="d-example">These are example figures. Replace them with your own.</p>
       <fieldset>
         <legend>The asset</legend>
         <div class="field wide"><label for="d-saved">Saved properties</label>
-          <div class="d-saved"><div class="control"><select id="d-saved" aria-label="Saved properties"></select></div><button type="button" id="d-save">Save</button><button type="button" id="d-delete">Delete</button></div>
+          <div class="control"><select id="d-saved" aria-label="Saved properties"></select></div>
           <p class="hint" id="d-saved-hint"></p></div>
-        <div class="field wide"><label for="d-name">Name</label><div class="control"><input id="d-name" type="text" placeholder="Cottage, rental on Elm St, shares" maxlength="60"></div></div>
+        <div class="field wide"><label for="d-name">Name of this property</label>
+          <div class="d-saved"><div class="control"><input id="d-name" type="text" placeholder="Elm St rental" maxlength="60"></div><button type="button" id="d-save">Save</button><button type="button" id="d-delete">Delete</button></div></div>
         <div class="field"><label for="d-value">Sale price</label><div class="control"><span class="affix">$</span><input id="d-value" type="text" data-money inputmode="numeric"></div></div>
         <div class="field"><label for="d-costs">Selling costs</label><div class="control"><span class="affix">$</span><input id="d-costs" type="text" data-money inputmode="numeric"></div></div>
         <div class="field"><label for="d-acb">Adjusted cost base</label><div class="control"><span class="affix">$</span><input id="d-acb" type="text" data-money inputmode="numeric"></div></div>
@@ -1638,10 +1661,10 @@ const Engine = (() => {
     budgetNote();
   }
   function setView(next) {
-    view = next === 'budget' || next === 'disposal' ? next : 'plan';
+    view = next === 'budget' || next === 'disposal' || next === 'rentals' ? next : 'plan';
     document.querySelector('.scenario').hidden = document.querySelector('.layout').hidden = view !== 'plan';
-    $('pane-budget').hidden = view !== 'budget'; $('pane-disposal').hidden = view !== 'disposal';
-    $('masthead-sub').textContent = view === 'disposal' ? 'Federal and provincial 2026 tax rules. Figures are for a single sale.' : "Ontario, 2026 tax rules. Every figure is in today's dollars.";
+    $('pane-budget').hidden = view !== 'budget'; $('pane-disposal').hidden = view !== 'disposal'; $('pane-rentals').hidden = view !== 'rentals';
+    $('masthead-sub').textContent = view === 'disposal' ? 'Federal and provincial 2026 tax rules. Figures are for a single sale.' : view === 'rentals' ? 'Rental cash flow from the properties you saved.' : "Ontario, 2026 tax rules. Every figure is in today's dollars.";
     $('tab-' + view).checked = true;
   }
 
@@ -1761,14 +1784,19 @@ const Engine = (() => {
     const qc = (d.provA === 'QC' || (d.joint && d.provB === 'QC'));
     $('d-note').textContent = 'Half of a capital gain is taxable. Each owner\'s tax is the extra tax from adding that half to the income entered, using 2026 federal and provincial rates and the basic personal amounts' + (qc ? ', with the Quebec federal abatement' : '') + '. Not included: the OAS recovery tax, the alternative minimum tax, age and other credits, the lifetime capital gains exemption, capital losses from other years, and any mortgage or loan paid out of the sale.';
   }
+  /* One property's yearly rental figures, before income tax. Used by the keep-or-sell panel and the rental summary. */
+  function rentFlows(d) {
+    const yr = x => x.amt * (x.per === 'm' ? 12 : 1);
+    const rentYr = d.rent * 12, vacancy = rentYr * d.vac / 100, eff = rentYr - vacancy, mgmt = eff * d.mgmt / 100;
+    const opex = (d.exp || []).reduce((a, x) => a + yr(x), 0), noi = eff - mgmt - opex;
+    const interest = yr(d.mi || { amt: 0, per: 'm' }), principal = yr(d.mp || { amt: 0, per: 'm' });
+    return { rentYr, vacancy, eff, mgmt, opex, noi, interest, principal, cash: noi - interest - principal, net: noi - interest };
+  }
   /* Keep or sell: the property's rental cash flow set beside the money you would have from selling. */
   function drawKeep(d, owners, tot, shares, prov, inc) {
     const box = $('d-keep'); box.hidden = !(d.rent > 0);
     if (box.hidden) return;
-    const yr = x => x.amt * (x.per === 'm' ? 12 : 1);
-    const rentYr = d.rent * 12, vacancy = rentYr * d.vac / 100, eff = rentYr - vacancy, mgmt = eff * d.mgmt / 100;
-    const opex = d.exp.reduce((a, x) => a + yr(x), 0), noi = eff - mgmt - opex;
-    const interest = yr(d.mi), principal = yr(d.mp), cash = noi - interest - principal, net = noi - interest;
+    const { rentYr, vacancy, mgmt, opex, noi, interest, principal, cash, net } = rentFlows(d);
     let rentTax = 0;
     shares.forEach((sh, i) => { rentTax += Engine.personTax(prov[i], inc[i] + net * sh).total - Engine.personTax(prov[i], inc[i]).total; });
     const after = cash - rentTax, sale = tot.pocket;
@@ -1806,7 +1834,7 @@ const Engine = (() => {
     box.value = sel !== undefined && Object.prototype.hasOwnProperty.call(dispSaved, sel) ? sel : '';
     $('d-delete').disabled = box.value === '';
     const n = Object.keys(dispSaved).length;
-    $('d-saved-hint').textContent = n ? 'Pick a saved property to load it. Save stores the current figures under the name below, and saving again under the same name updates it.' : 'Save the figures for each property under its own name, then come back to any of them from this list.';
+    $('d-saved-hint').textContent = n ? 'Pick a saved property to load it. Save stores the figures on screen under the name below, and saving again under the same name updates it.' : 'Save the figures for each property under its own name, then come back to any of them from this list.';
   }
   function newProperty() {
     const cur = dispState(), zero = DISPOSAL_EXAMPLE.exp.map(x => Object.assign({}, x, { amt: 0 }));
@@ -1814,23 +1842,64 @@ const Engine = (() => {
       name: '', value: 0, costs: 0, acb: 0, gain: 0, mortgage: 0, home: false, rent: 0, mgmt: 0, exp: zero, mi: { amt: 0, per: 'm' }, mp: { amt: 0, per: 'm' } }));
     syncSaved(''); dispExample = false; drawDisposal(); persist();
   }
+  function loadProperty(name) {
+    fillDisp(Object.assign({}, dispSaved[name], { name })); syncSaved(name); dispExample = false; drawDisposal(); persist();
+  }
   $('d-saved').addEventListener('change', e => {
     const name = e.target.value;
     if (name === '') { newProperty(); return; }
-    fillDisp(Object.assign({}, dispSaved[name], { name })); syncSaved(name); dispExample = false; drawDisposal(); persist();
+    loadProperty(name);
   });
   $('d-save').addEventListener('click', () => {
     let name = $('d-name').value.trim();
     if (!name) { name = 'Property ' + (Object.keys(dispSaved).length + 1); $('d-name').value = name; }
     dispExample = false;
-    dispSaved[name] = dispState(); syncSaved(name); drawDisposal(); persist();
+    dispSaved[name] = dispState(); syncSaved(name); drawDisposal(); drawRentals(); persist();
     const b = $('d-save'); b.textContent = 'Saved'; setTimeout(() => { b.textContent = 'Save'; }, 1800);
   });
   $('d-delete').addEventListener('click', () => {
     const name = $('d-saved').value;
     if (!name || !window.confirm('Delete the saved property "' + name + '"?')) return;
-    delete dispSaved[name]; syncSaved(''); persist();
+    delete dispSaved[name]; syncSaved(''); drawRentals(); persist();
   });
+  /* Rental summary: every saved property with rent, before income tax (each saved view has its own income, so tax can't be added up). */
+  function drawRentals() {
+    const rows = Object.entries(dispSaved).map(([name, d]) => {
+      d = Object.assign({}, DISPOSAL_EXAMPLE, d); const f = rentFlows(d);
+      return { name, f, value: d.hasValue ? d.value : 0, expenses: f.mgmt + f.opex, mortgage: f.interest + f.principal };
+    }).filter(r => r.f.rentYr > 0);
+    const sum = k => rows.reduce((a, r) => a + k(r), 0);
+    const cash = sum(r => r.f.cash);
+    $('r-month').textContent = fmt(cash / 12);
+    $('r-year').textContent = rows.length ? `${fmt(cash)} a year across ${rows.length} ${rows.length === 1 ? 'property' : 'properties'}, after expenses and mortgage payments. Rent collected is ${fmt(sum(r => r.f.eff))} a year.`
+      : 'No saved properties with rent yet. Fill in a property on the Asset disposal tab and press Save to see it here.';
+    const bars = $('r-bars'); bars.replaceChildren();
+    const top = Math.max(1, ...rows.map(r => Math.abs(r.f.cash)));
+    for (const r of rows) {
+      const row = el('div', 'b-bar'), track = el('div', 'track'), fill = el('div', 'fill' + (r.f.cash < 0 ? ' neg' : ''));
+      fill.style.width = (Math.abs(r.f.cash) / top * 100) + '%'; track.appendChild(fill);
+      row.append(el('span', null, r.name), track, el('b', null, (r.f.cash < 0 ? '−' : '') + fmt(Math.abs(r.f.cash) / 12))); bars.appendChild(row);
+    }
+    const head = $('r-table').tHead, body = $('r-table').tBodies[0]; head.replaceChildren(); body.replaceChildren();
+    const old = $('r-table').tFoot; if (old) old.remove();
+    $('r-table').hidden = !rows.length;
+    if (!rows.length) { $('r-note').textContent = ''; return; }
+    const hr = el('tr'); for (const h of ['Property', 'Rent collected', 'Expenses', 'Net operating income', 'Mortgage payments', 'Cash flow a year', 'Cash flow a month', 'Cap rate']) hr.appendChild(el('th', null, h)); head.appendChild(hr);
+    const sg = v => (v < -0.5 ? '−' + fmt(-v) : fmt(Math.abs(v) < 0.5 ? 0 : v));
+    const line = (tr, vals) => { for (const v of vals) tr.appendChild(el('td', null, v)); return tr; };
+    const cap = r => r.value > 0 ? (r.f.noi / r.value * 100).toFixed(1) + '%' : '–';
+    for (const r of rows) {
+      const tr = el('tr'), td = el('td'), b = el('button', 'linkish', r.name); b.type = 'button'; b.title = 'Open this property';
+      b.addEventListener('click', () => { loadProperty(r.name); setView('disposal'); persist(); });
+      td.appendChild(b); tr.appendChild(td);
+      line(tr, [fmt(r.f.eff), sg(-r.expenses), sg(r.f.noi), sg(-r.mortgage), sg(r.f.cash), sg(r.f.cash / 12), cap(r)]); body.appendChild(tr);
+    }
+    const foot = el('tfoot'), ft = el('tr'); ft.appendChild(el('td', null, 'Total'));
+    const withValue = rows.filter(r => r.value > 0), vSum = withValue.reduce((a, r) => a + r.value, 0), nSum = withValue.reduce((a, r) => a + r.f.noi, 0);
+    line(ft, [fmt(sum(r => r.f.eff)), sg(-sum(r => r.expenses)), sg(sum(r => r.f.noi)), sg(-sum(r => r.mortgage)), sg(cash), sg(cash / 12), vSum > 0 ? (nSum / vSum * 100).toFixed(1) + '%' : '–']);
+    foot.appendChild(ft); $('r-table').appendChild(foot);
+    $('r-note').textContent = 'Only saved properties are counted, using the figures as last saved. Rent collected is after the vacancy allowance. Expenses are property management plus every expense line. The mortgage is shown separately. Cap rate is net operating income divided by the sale price you entered, and the total covers the properties that have a price. Income tax is left out because each saved property carries its own income figure. Click a property to open it.';
+  }
   function dispChanged(e) { if (!e || e.target.type === 'text' || e.target.type === 'number') dispExample = false; drawDisposal(); persist(); }
   const dform = $('disposal-form');
   $('d-exp-add').addEventListener('click', () => { $('d-exp').appendChild(expRow({ name: '', amt: 0, per: 'm', custom: true })); const last = $('d-exp').lastChild; last.querySelector('input').focus(); dispChanged(); });
@@ -1954,7 +2023,7 @@ const Engine = (() => {
     recalc();
   });
   for (const id of ['fan-real', 'fan-nominal']) $(id).addEventListener('change', e => { fanNominal = e.target.value === 'nominal'; if (state) drawFan(state.p, state.mc); persist(); });
-  for (const id of ['tab-plan', 'tab-budget', 'tab-disposal']) $(id).addEventListener('change', e => { setView(e.target.value); persist(); });
+  for (const id of ['tab-plan', 'tab-budget', 'tab-disposal', 'tab-rentals']) $(id).addEventListener('change', e => { setView(e.target.value); persist(); });
   for (const id of ['mode-joint', 'mode-a', 'mode-b']) $(id).addEventListener('change', recalc);
   $('in-crash-when').addEventListener('change', () => { $('example-note').hidden = true; recalc(); });
   $('add-prop').addEventListener('click', () => {
@@ -1996,7 +2065,7 @@ const Engine = (() => {
     fill(last); applyMode(last.mode); $('example-note').hidden = true; }
   else fill(EXAMPLE);
   if (saved && saved.disposalSaved && typeof saved.disposalSaved === 'object') for (const [k, v] of Object.entries(saved.disposalSaved)) if (v && typeof v === 'object') dispSaved[String(k).slice(0, 60)] = v;
-  dispExample = !(saved && saved.disposal); fillDisp(saved && saved.disposal); syncSaved(saved && saved.disposal ? saved.disposal.name : ''); drawDisposal();
+  dispExample = !(saved && saved.disposal); fillDisp(saved && saved.disposal); syncSaved(saved && saved.disposal ? saved.disposal.name : ''); drawDisposal(); drawRentals();
   budget = normBudget(saved && saved.budget); drawBudget();
   setView(saved && saved.view);
   recalc();
