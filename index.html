@@ -187,6 +187,9 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .d-table tr.key td { font-weight: 600; color: var(--ink); }
 .d-table tr.key td:first-child { color: var(--ink); }
 .d-note { margin-top: 14px; }
+.d-saved { display: flex; gap: 8px; align-items: center; }
+.d-saved .control { flex: 1; }
+.d-saved button:disabled { opacity: 0.45; cursor: default; }
 .disposal .b-summary { position: static; }
 .d-rows { grid-column: 1 / -1; display: grid; gap: 6px; min-width: 0; }
 .d-row { display: grid; grid-template-columns: minmax(0, 1fr) 112px 92px; gap: 6px 8px; align-items: center; }
@@ -577,7 +580,10 @@ details summary { cursor: pointer; font-weight: 600; }
       <p class="example-note" id="d-example">These are example figures. Replace them with your own.</p>
       <fieldset>
         <legend>The asset</legend>
-        <div class="field wide"><label for="d-name">What is being sold (optional)</label><div class="control"><input id="d-name" type="text" placeholder="Cottage, rental property, shares" maxlength="60"></div></div>
+        <div class="field wide"><label for="d-saved">Saved properties</label>
+          <div class="d-saved"><div class="control"><select id="d-saved" aria-label="Saved properties"></select></div><button type="button" id="d-save">Save</button><button type="button" id="d-delete">Delete</button></div>
+          <p class="hint" id="d-saved-hint"></p></div>
+        <div class="field wide"><label for="d-name">Name</label><div class="control"><input id="d-name" type="text" placeholder="Cottage, rental on Elm St, shares" maxlength="60"></div></div>
         <div class="field"><label for="d-value">Sale price</label><div class="control"><span class="affix">$</span><input id="d-value" type="text" data-money inputmode="numeric"></div></div>
         <div class="field"><label for="d-costs">Selling costs</label><div class="control"><span class="affix">$</span><input id="d-costs" type="text" data-money inputmode="numeric"></div></div>
         <div class="field"><label for="d-acb">Adjusted cost base</label><div class="control"><span class="affix">$</span><input id="d-acb" type="text" data-money inputmode="numeric"></div></div>
@@ -1069,7 +1075,8 @@ const Engine = (() => {
   const STORE = 'retirement-income-simulator-couple-v1';
   /* Everything typed, on either tab, is saved together in this browser. */
   let fromLink = false;   // true while showing numbers from a shared link that have not been kept
-  const snapshot = () => Object.assign({}, last, { budget, view, fanNominal, autoPick, orderV: 2, spendBy, disposal: dispExample ? undefined : dispState() });
+  let dispSaved = {};   // saved disposal views, by property name
+  const snapshot = () => Object.assign({}, last, { budget, view, fanNominal, autoPick, orderV: 2, spendBy, disposal: dispExample ? undefined : dispState(), disposalSaved: dispSaved });
   function persist() { if (fromLink) return; try { localStorage.setItem(STORE, JSON.stringify(snapshot())); } catch (e) {} }
 
   const money = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0, currencyDisplay: 'narrowSymbol' });
@@ -1792,17 +1799,51 @@ const Engine = (() => {
       ? `Keeping the property pays ${fmt(cash / 12)} a month before tax (${fmt(after / 12)} after tax), which is ${p1(cash / sale)} a year on the ${fmt(sale)} you would have from selling. Investing that money at ${d.invest}% would pay about ${fmt(invested / 12)} a month before tax. ` + (value > 0 ? `Counting the mortgage you pay down and ${d.growth}% growth in the property's value, keeping it works out to ${p1((cash + principal + growth) / sale)} a year.` : '')
       : `Keeping the property pays ${fmt(cash / 12)} a month before tax (${fmt(after / 12)} after tax).`;
   }
+  /* Saved properties: each is a full copy of the form, kept under its name. */
+  function syncSaved(sel) {
+    const box = $('d-saved'); box.replaceChildren(new Option('New property (not saved)', ''));
+    for (const name of Object.keys(dispSaved)) box.appendChild(new Option(name, name));
+    box.value = sel !== undefined && Object.prototype.hasOwnProperty.call(dispSaved, sel) ? sel : '';
+    $('d-delete').disabled = box.value === '';
+    const n = Object.keys(dispSaved).length;
+    $('d-saved-hint').textContent = n ? 'Pick a saved property to load it. Save stores the current figures under the name below, and saving again under the same name updates it.' : 'Save the figures for each property under its own name, then come back to any of them from this list.';
+  }
+  function newProperty() {
+    const cur = dispState(), zero = DISPOSAL_EXAMPLE.exp.map(x => Object.assign({}, x, { amt: 0 }));
+    fillDisp(Object.assign({}, DISPOSAL_EXAMPLE, { incA: cur.incA, incB: cur.incB, provA: cur.provA, provB: cur.provB, joint: cur.joint, share: cur.share, provTouched: cur.provTouched,
+      name: '', value: 0, costs: 0, acb: 0, gain: 0, mortgage: 0, home: false, rent: 0, mgmt: 0, exp: zero, mi: { amt: 0, per: 'm' }, mp: { amt: 0, per: 'm' } }));
+    syncSaved(''); dispExample = false; drawDisposal(); persist();
+  }
+  $('d-saved').addEventListener('change', e => {
+    const name = e.target.value;
+    if (name === '') { newProperty(); return; }
+    fillDisp(Object.assign({}, dispSaved[name], { name })); syncSaved(name); dispExample = false; drawDisposal(); persist();
+  });
+  $('d-save').addEventListener('click', () => {
+    let name = $('d-name').value.trim();
+    if (!name) { name = 'Property ' + (Object.keys(dispSaved).length + 1); $('d-name').value = name; }
+    dispExample = false;
+    dispSaved[name] = dispState(); syncSaved(name); drawDisposal(); persist();
+    const b = $('d-save'); b.textContent = 'Saved'; setTimeout(() => { b.textContent = 'Save'; }, 1800);
+  });
+  $('d-delete').addEventListener('click', () => {
+    const name = $('d-saved').value;
+    if (!name || !window.confirm('Delete the saved property "' + name + '"?')) return;
+    delete dispSaved[name]; syncSaved(''); persist();
+  });
   function dispChanged(e) { if (!e || e.target.type === 'text' || e.target.type === 'number') dispExample = false; drawDisposal(); persist(); }
   const dform = $('disposal-form');
   $('d-exp-add').addEventListener('click', () => { $('d-exp').appendChild(expRow({ name: '', amt: 0, per: 'm', custom: true })); const last = $('d-exp').lastChild; last.querySelector('input').focus(); dispChanged(); });
   dform.addEventListener('input', e => {
     const id = e.target.id;
+    if (id === 'd-name') { const nm = e.target.value.trim(); $('d-saved').value = Object.prototype.hasOwnProperty.call(dispSaved, nm) ? nm : ''; $('d-delete').disabled = $('d-saved').value === ''; }
     if (isMoney(e.target)) regroup(e.target);
     if (id === 'd-value' || id === 'd-acb' || id === 'd-costs') autoGain();
     dispChanged(e);
   });
   dform.addEventListener('change', e => {
     const id = e.target.id;
+    if (id === 'd-saved') return;
     if (id === 'd-prov-a' && !provTouched) $('d-prov-b').value = $('d-prov-a').value;
     if (id === 'd-prov-b') provTouched = true;
     dispChanged(e);
@@ -1954,7 +1995,8 @@ const Engine = (() => {
     fanNominal = saved.fanNominal === true;
     fill(last); applyMode(last.mode); $('example-note').hidden = true; }
   else fill(EXAMPLE);
-  dispExample = !(saved && saved.disposal); fillDisp(saved && saved.disposal); drawDisposal();
+  if (saved && saved.disposalSaved && typeof saved.disposalSaved === 'object') for (const [k, v] of Object.entries(saved.disposalSaved)) if (v && typeof v === 'object') dispSaved[String(k).slice(0, 60)] = v;
+  dispExample = !(saved && saved.disposal); fillDisp(saved && saved.disposal); syncSaved(saved && saved.disposal ? saved.disposal.name : ''); drawDisposal();
   budget = normBudget(saved && saved.budget); drawBudget();
   setView(saved && saved.view);
   recalc();
