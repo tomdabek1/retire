@@ -167,6 +167,23 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .b-link button { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 .b-link button:hover { color: var(--on-accent); opacity: 0.9; }
 
+/* Asset disposal tab */
+.d-form fieldset:first-of-type { border-top: 0; }
+.d-form .example-note { border-radius: 10px 10px 0 0; }
+.d-form .field.wide.seg { display: block; }
+.d-split { display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin-top: 16px; background: var(--accent-soft); }
+.d-split i { display: block; height: 100%; }
+.d-legend { margin: 8px 0 0; }
+.d-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.d-table th { text-align: right; font-weight: 600; font-size: 0.82rem; color: var(--ink-2); padding: 0 0 6px 12px; }
+.d-table td { padding: 6px 0 6px 12px; border-top: 1px solid var(--line); text-align: right; color: var(--ink); }
+.d-table td:first-child { padding-left: 0; text-align: left; color: var(--ink-2); }
+.d-table tr.key td { font-weight: 600; color: var(--ink); }
+.d-table tr.key td:first-child { color: var(--ink); }
+.d-note { margin-top: 14px; }
+.disposal[data-own="one"] [data-d="b"], .disposal[data-own="one"] #d-who, .disposal[data-own="one"] #d-share-row { display: none; }
+.disposal[data-own="one"] .pair { grid-template-columns: minmax(0, 1fr); }
+
 /* Property list */
 .props { grid-column: 1 / -1; display: grid; gap: 10px; min-width: 0; }
 .props:empty { display: none; }
@@ -259,13 +276,14 @@ details summary { cursor: pointer; font-weight: 600; }
 <div class="wrap">
   <header class="masthead">
     <h1>Retirement Income Simulator</h1>
-    <p>Ontario, 2026 tax rules. Every figure is in today's dollars.</p>
+    <p id="masthead-sub">Ontario, 2026 tax rules. Every figure is in today's dollars.</p>
   </header>
 
   <div class="topbar">
     <div class="segments" role="radiogroup" aria-label="View">
       <label><input type="radio" name="view" id="tab-plan" value="plan" checked><span>Simulator</span></label>
       <label><input type="radio" name="view" id="tab-budget" value="budget"><span>Budget</span></label>
+      <label><input type="radio" name="view" id="tab-disposal" value="disposal"><span>Asset disposal</span></label>
     </div>
     <div class="scenario">
       <span id="scenario-label">Scenario</span>
@@ -526,6 +544,49 @@ details summary { cursor: pointer; font-weight: 600; }
       <div class="actions"><button type="button" id="b-add">Add a category</button><button type="button" id="b-clear">Clear the budget</button></div>
     </form>
   </div>
+
+  <div class="budget disposal" id="pane-disposal" hidden>
+    <form class="panel b-form d-form" id="disposal-form" autocomplete="off" novalidate>
+      <p class="example-note" id="d-example">These are example figures. Replace them with your own.</p>
+      <fieldset>
+        <legend>The asset</legend>
+        <div class="field wide"><label for="d-name">What is being sold (optional)</label><div class="control"><input id="d-name" type="text" placeholder="Cottage, rental property, shares" maxlength="60"></div></div>
+        <div class="field"><label for="d-value">Sale price</label><div class="control"><span class="affix">$</span><input id="d-value" type="text" data-money inputmode="numeric"></div></div>
+        <div class="field"><label for="d-costs">Selling costs</label><div class="control"><span class="affix">$</span><input id="d-costs" type="text" data-money inputmode="numeric"></div></div>
+        <div class="field"><label for="d-acb">Adjusted cost base</label><div class="control"><span class="affix">$</span><input id="d-acb" type="text" data-money inputmode="numeric"></div></div>
+        <div class="field"><label for="d-gain">Capital gain</label><div class="control"><span class="affix">$</span><input id="d-gain" type="text" data-money data-signed inputmode="numeric"></div></div>
+        <p class="hint">Type the sale price and the adjusted cost base (what you paid, plus improvements) and the gain is worked out for you. If you already know the gain, type it in. Selling costs are commissions and legal fees.</p>
+        <label class="check" for="d-home"><input id="d-home" type="checkbox"> This was my principal residence for every year I owned it (the gain is tax free)</label>
+      </fieldset>
+      <fieldset>
+        <legend>Who owns it</legend>
+        <div class="field wide seg"><div class="segments" role="radiogroup" aria-label="Ownership">
+          <label><input type="radio" name="d-own" id="d-own-one" value="one" checked><span>One owner</span></label>
+          <label><input type="radio" name="d-own" id="d-own-joint" value="joint"><span>Two owners</span></label></div></div>
+        <div class="field wide" id="d-share-row"><label for="d-share">Your share of the ownership</label><div class="control" style="max-width: 7em"><input id="d-share" type="number" min="0" max="100" step="5" inputmode="decimal"><span class="affix end">%</span></div><p class="hint" id="d-share-hint"></p></div>
+      </fieldset>
+      <fieldset>
+        <legend>Income this year, before the sale</legend>
+        <div class="who" id="d-who"><span>You</span><span>Your spouse</span></div>
+        <div class="pair"><span class="pair-label">Income</span>
+          <div class="control"><span class="affix">$</span><input id="d-inc-a" aria-label="Income before the sale, you" type="text" data-money inputmode="numeric"></div>
+          <div class="control" data-d="b"><span class="affix">$</span><input id="d-inc-b" aria-label="Income before the sale, your spouse" type="text" data-money inputmode="numeric"></div></div>
+        <div class="pair"><span class="pair-label">Province or territory</span>
+          <div class="control"><select id="d-prov-a" aria-label="Province, you"></select></div>
+          <div class="control" data-d="b"><select id="d-prov-b" aria-label="Province, your spouse"></select></div></div>
+        <p class="hint">Use your net income (line 23600 of your tax return) if you know it. Gross income works too, and will overstate the tax slightly because deductions such as RRSP contributions are not known. Include any pension, CPP, OAS and rental income. Leave it at zero if the sale is your only income.</p>
+      </fieldset>
+    </form>
+    <section class="panel b-summary" aria-live="polite">
+      <div class="odds-label" id="d-title">Money in your pocket</div>
+      <div class="odds-num" id="d-pocket">$0</div>
+      <p class="odds-text" id="d-pocket-sub"></p>
+      <div class="d-split" id="d-split"></div>
+      <div class="legend d-legend" id="d-legend"></div>
+      <table class="d-table" id="d-table"><thead></thead><tbody></tbody></table>
+      <p class="hint d-note" id="d-note"></p>
+    </section>
+  </div>
 </div>
 
 <script>
@@ -590,6 +651,49 @@ const Engine = (() => {
     const onBase = Math.max(0, bracketTax(ti, O.brackets) - O.rate * oc);
     const on = onBase + 0.20 * Math.max(0, onBase - O.surtax1) + 0.36 * Math.max(0, onBase - O.surtax2) + healthPremium(ti);
     return fed + on + claw;
+  }
+
+  /* Provincial and territorial 2026 tax tables (CRA): name, basic personal amount, brackets [upper limit, rate].
+     Manitoba's basic amount fades to zero between $200,000 and $400,000. Ontario's surtax and health premium are handled in personTax. */
+  const PROVINCES = {
+    AB: ['Alberta', 22769, [[61200, 0.08], [154259, 0.10], [185111, 0.12], [246813, 0.13], [370220, 0.14], [Infinity, 0.15]]],
+    BC: ['British Columbia', 13216, [[50363, 0.056], [100728, 0.077], [115648, 0.105], [140430, 0.1229], [190405, 0.147], [265545, 0.168], [Infinity, 0.205]]],
+    MB: ['Manitoba', 15780, [[47564, 0.108], [101200, 0.1275], [Infinity, 0.174]], [200000, 400000]],
+    NB: ['New Brunswick', 13664, [[52333, 0.094], [104666, 0.14], [193861, 0.16], [Infinity, 0.195]]],
+    NL: ['Newfoundland and Labrador', 13094, [[44678, 0.087], [89354, 0.145], [159528, 0.158], [223340, 0.178], [285319, 0.198], [570638, 0.208], [1141275, 0.213], [Infinity, 0.218]]],
+    NT: ['Northwest Territories', 18198, [[53003, 0.059], [106009, 0.086], [172346, 0.122], [Infinity, 0.1405]]],
+    NS: ['Nova Scotia', 11932, [[30995, 0.0879], [61991, 0.1495], [97417, 0.1667], [157124, 0.175], [Infinity, 0.21]]],
+    NU: ['Nunavut', 19659, [[55801, 0.04], [111602, 0.07], [181439, 0.09], [Infinity, 0.115]]],
+    ON: ['Ontario', 12989, O.brackets],
+    PE: ['Prince Edward Island', 15000, [[33928, 0.095], [65820, 0.1347], [106890, 0.166], [142520, 0.1762], [200000, 0.19], [Infinity, 0.20]]],
+    QC: ['Quebec', 18952, [[54345, 0.14], [108680, 0.19], [132245, 0.24], [Infinity, 0.2575]]],
+    SK: ['Saskatchewan', 20381, [[54532, 0.105], [155805, 0.125], [Infinity, 0.145]]],
+    YT: ['Yukon', 16452, [[58523, 0.064], [117045, 0.09], [181440, 0.109], [500000, 0.128], [Infinity, 0.15]]]
+  };
+  /* Income tax for one person on `income` (taxable income), with only the basic personal amounts as credits.
+     Quebec residents get the 16.5% federal abatement. Returns { fed, prov, total }. */
+  function personTax(code, income) {
+    const ti = Math.max(0, income || 0), P = PROVINCES[code];
+    let bpa = F.bpaMax;
+    if (ti > F.bpaStart) bpa = Math.max(F.bpaMin, F.bpaMax - (F.bpaMax - F.bpaMin) * (ti - F.bpaStart) / (F.bpaEnd - F.bpaStart));
+    let fed = Math.max(0, bracketTax(ti, F.brackets) - F.rate * bpa);
+    if (code === 'QC') fed *= 0.835;
+    let prov;
+    if (code === 'ON') {
+      const base = Math.max(0, bracketTax(ti, O.brackets) - O.rate * O.bpa);
+      prov = base + 0.20 * Math.max(0, base - O.surtax1) + 0.36 * Math.max(0, base - O.surtax2) + healthPremium(ti);
+    } else {
+      const fade = P[3], credit = fade ? P[1] * Math.max(0, Math.min(1, (fade[1] - ti) / (fade[1] - fade[0]))) : P[1];
+      prov = Math.max(0, bracketTax(ti, P[2]) - P[2][0][1] * credit);
+    }
+    return { fed, prov, total: fed + prov };
+  }
+  /* Extra tax from realizing `gain` on top of `income` already earned that year. Half of a gain is taxable.
+     marginal is the tax on the next dollar of gain. */
+  function disposalTax(code, income, gain) {
+    const inc = Math.max(0, income || 0), taxable = Math.max(0, gain || 0) * 0.5;
+    const a = personTax(code, inc), b = personTax(code, inc + taxable), c = personTax(code, inc + taxable + 100);
+    return { taxable, fed: b.fed - a.fed, prov: b.prov - a.prov, tax: b.total - a.total, marginal: 0.5 * (c.total - b.total) / 100 };
   }
 
   const CASH_RATE = 0;   // nominal interest on uninvested cash: none, so it loses ground to inflation
@@ -879,7 +983,7 @@ const Engine = (() => {
     return Math.floor(lo / 500) * 500;
   }
 
-  return { tax, healthPremium, rrifFactor, cppAnnual, oasAnnual, run, deterministic, monteCarlo, compareOrders, ORDERS, propertyPlan,
+  return { tax, personTax, disposalTax, PROVINCES, healthPremium, rrifFactor, cppAnnual, oasAnnual, run, deterministic, monteCarlo, compareOrders, ORDERS, propertyPlan,
     sustainableSpending, realRate, drawStartIndex, yearCount, CPP_MAX_MONTHLY, OAS_MONTHLY, OAS_THRESHOLD };
 })();
 
@@ -911,7 +1015,7 @@ const Engine = (() => {
   let autoPick = 'bracket';   // the order Automatic chose last time, used for the first draw
   const STORE = 'retirement-income-simulator-couple-v1';
   /* Everything typed, on either tab, is saved together in this browser. */
-  function persist() { try { localStorage.setItem(STORE, JSON.stringify(Object.assign({}, last, { budget, view, fanNominal, autoPick, orderV: 2, spendBy }))); } catch (e) {} }
+  function persist() { try { localStorage.setItem(STORE, JSON.stringify(Object.assign({}, last, { budget, view, fanNominal, autoPick, orderV: 2, spendBy, disposal: dispExample ? undefined : dispState() }))); } catch (e) {} }
 
   const money = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0, currencyDisplay: 'narrowSymbol' });
   const fmt = v => money.format(Math.round(v));
@@ -926,7 +1030,7 @@ const Engine = (() => {
   const isMoney = node => !!node && node.nodeType === 1 && node.hasAttribute('data-money');
   const setVal = (id, v) => { const node = $(id); node.value = isMoney(node) ? commas(v) : v; };
   function regroup(node) {   // re-insert the commas while typing, keeping the caret after the same digit
-    const out = commas(node.value);
+    const out = (node.hasAttribute('data-signed') && /^\s*[-\u2212]/.test(node.value) ? '-' : '') + commas(node.value);
     if (out === node.value) return;
     const keep = raw(node.value.slice(0, node.selectionStart == null ? node.value.length : node.selectionStart)).length;
     node.value = out;
@@ -1472,11 +1576,110 @@ const Engine = (() => {
     budgetNote();
   }
   function setView(next) {
-    view = next === 'budget' ? 'budget' : 'plan';
+    view = next === 'budget' || next === 'disposal' ? next : 'plan';
     document.querySelector('.scenario').hidden = document.querySelector('.layout').hidden = view !== 'plan';
-    $('pane-budget').hidden = view !== 'budget';
+    $('pane-budget').hidden = view !== 'budget'; $('pane-disposal').hidden = view !== 'disposal';
+    $('masthead-sub').textContent = view === 'disposal' ? 'Federal and provincial 2026 tax rules. Figures are for a single sale.' : "Ontario, 2026 tax rules. Every figure is in today's dollars.";
     $('tab-' + view).checked = true;
   }
+
+  /* ---------- asset disposal ---------- */
+  const DISPOSAL_EXAMPLE = { name: '', value: 800000, costs: 0, acb: 300000, gain: 500000, home: false, joint: false, share: 50, incA: 90000, incB: 60000, provA: 'ON', provB: 'ON', provTouched: false };
+  let dispExample = true;
+  for (const [code, P] of Object.entries(Engine.PROVINCES)) for (const id of ['d-prov-a', 'd-prov-b']) $(id).appendChild(new Option(P[0], code));
+  const dnum = id => {
+    const node = $(id), t = node.value, n = parseFloat(raw(t));
+    return Number.isFinite(n) ? (node.hasAttribute('data-signed') && /^\s*[-−]/.test(t) ? -n : n) : 0;
+  };
+  const dblank = id => raw($(id).value) === '';
+  const setSigned = (id, v) => { $(id).value = (v < 0 ? '-' : '') + commas(Math.abs(Math.round(v))); };
+  function dispState() {
+    const joint = $('d-own-joint').checked;
+    return { name: $('d-name').value.trim(), value: dnum('d-value'), hasValue: !dblank('d-value'), costs: dnum('d-costs'), acb: dnum('d-acb'), gain: dnum('d-gain'),
+      home: $('d-home').checked, joint, share: clamp(Number.isFinite(parseFloat($('d-share').value)) ? parseFloat($('d-share').value) : 50, 0, 100),
+      incA: dnum('d-inc-a'), incB: dnum('d-inc-b'), provA: $('d-prov-a').value, provB: $('d-prov-b').value, provTouched };
+  }
+  let provTouched = false;
+  function fillDisp(d) {
+    d = Object.assign({}, DISPOSAL_EXAMPLE, d || {});
+    $('d-name').value = d.name || '';
+    setVal('d-value', d.value); setVal('d-costs', d.costs); setVal('d-acb', d.acb); setSigned('d-gain', +d.gain || 0);
+    if (!(d.value > 0)) $('d-value').value = '';
+    $('d-home').checked = !!d.home; $('d-own-joint').checked = !!d.joint; $('d-own-one').checked = !d.joint;
+    $('d-share').value = d.share; setVal('d-inc-a', d.incA); setVal('d-inc-b', d.incB);
+    $('d-prov-a').value = Engine.PROVINCES[d.provA] ? d.provA : 'ON'; $('d-prov-b').value = Engine.PROVINCES[d.provB] ? d.provB : 'ON';
+    provTouched = !!d.provTouched;
+  }
+  function autoGain() {
+    if (dblank('d-value') || dblank('d-acb')) return;
+    setSigned('d-gain', dnum('d-value') - dnum('d-acb') - dnum('d-costs'));
+  }
+  const pct = x => (x * 100).toFixed(1).replace(/\.0$/, '') + '%';
+  function drawDisposal() {
+    const d = dispState(), pane = $('pane-disposal');
+    pane.dataset.own = d.joint ? 'joint' : 'one'; $('disposal-form').dataset.mode = d.joint ? 'joint' : 'a';
+    $('d-share-hint').textContent = d.joint ? `Your spouse owns the other ${100 - d.share}%.` : '';
+    $('d-example').hidden = !dispExample;
+    const shares = d.joint ? [d.share / 100, 1 - d.share / 100] : [1];
+    const prov = [d.provA, d.provB], inc = [d.incA, d.incB];
+    const owners = shares.map((sh, i) => {
+      const gain = d.gain * sh, t = d.home || gain <= 0 ? { taxable: 0, fed: 0, prov: 0, tax: 0, marginal: 0 } : Engine.disposalTax(prov[i], inc[i], gain);
+      const price = d.hasValue ? d.value * sh : null, costs = d.costs * sh;
+      const pocket = (d.hasValue ? price - costs : gain) - t.tax;
+      return Object.assign(t, { gain, price, costs, pocket, inc: inc[i], sh });
+    });
+    const sum = k => owners.reduce((a, o) => a + (o[k] || 0), 0);
+    const tot = { gain: sum('gain'), price: d.hasValue ? sum('price') : null, costs: sum('costs'), taxable: sum('taxable'), fed: sum('fed'), prov: sum('prov'), tax: sum('tax'), pocket: sum('pocket') };
+    const label = d.name || 'the asset';
+    $('d-title').textContent = d.hasValue ? 'Money in your pocket' : 'Gain left after tax';
+    $('d-pocket').textContent = fmt(tot.pocket);
+    $('d-pocket-sub').textContent = d.home ? `Principal residence: no tax on the gain from selling ${label}.`
+      : tot.gain <= 0 ? `No tax is payable on ${label}, because there is no gain.`
+      : `After ${fmt(tot.tax)} of tax on a ${fmt(tot.gain)} gain, ${pct(tot.tax / tot.gain)} of the gain.`;
+    // bar: where the sale price (or the gain) goes
+    const parts = d.hasValue ? [['In your pocket', tot.pocket, 'var(--accent)'], ['Income tax', tot.tax, 'var(--crit)'], ['Selling costs', tot.costs, 'var(--muted)']]
+      : [['Left after tax', tot.pocket, 'var(--accent)'], ['Income tax', tot.tax, 'var(--crit)']];
+    const whole = parts.reduce((a, p) => a + Math.max(0, p[1]), 0);
+    const split = $('d-split'), legend = $('d-legend'); split.replaceChildren(); legend.replaceChildren();
+    if (whole > 0) for (const [name, v, color] of parts) {
+      if (v <= 0.5) continue;
+      const seg = el('i'); seg.style.width = (v / whole * 100) + '%'; seg.style.background = color; seg.title = name + ' ' + fmt(v); split.appendChild(seg);
+      const sp = el('span'), sw = el('i'); sw.style.background = color; sp.append(sw, document.createTextNode(name + ' ' + fmt(v))); legend.appendChild(sp);
+    }
+    // table
+    const cols = d.joint ? [...owners, tot] : [tot];
+    const head = $('d-table').tHead, body = $('d-table').tBodies[0]; head.replaceChildren(); body.replaceChildren();
+    if (d.joint) { const tr = el('tr'); for (const h of ['', 'You', 'Your spouse', 'Total']) tr.appendChild(el('th', null, h)); head.appendChild(tr); }
+    const row = (name, f, cls) => { const tr = el('tr', cls); tr.appendChild(el('td', null, name)); for (const c of cols) tr.appendChild(el('td', null, f(c))); body.appendChild(tr); };
+    const money = k => c => (c[k] == null ? '–' : fmt(c[k]));
+    const isTot = c => c === tot;
+    if (d.hasValue) { row(d.joint ? 'Share of the sale price' : 'Sale price', money('price')); if (d.costs) row('Selling costs', c => fmt(-c.costs)); }
+    row('Capital gain', money('gain'));
+    row('Taxable part (half of the gain)', money('taxable'));
+    row('Income before the sale', c => isTot(c) ? '–' : fmt(c.inc));
+    row('Federal tax on the gain', money('fed'));
+    row('Provincial tax on the gain', money('prov'));
+    row('Tax on the gain', money('tax'), 'key');
+    row('Tax as a share of the gain', c => c.gain > 0 ? pct(c.tax / c.gain) : '–');
+    row('Tax on the next dollar of gain', c => isTot(c) || !(c.gain > 0) || d.home ? '–' : pct(c.marginal));
+    row(d.hasValue ? 'Money in your pocket' : 'Gain after tax', money('pocket'), 'key');
+    const qc = (d.provA === 'QC' || (d.joint && d.provB === 'QC'));
+    $('d-note').textContent = 'Half of a capital gain is taxable. Each owner\'s tax is the extra tax from adding that half to the income entered, using 2026 federal and provincial rates and the basic personal amounts' + (qc ? ', with the Quebec federal abatement' : '') + '. Not included: the OAS recovery tax, the alternative minimum tax, age and other credits, the lifetime capital gains exemption, capital losses from other years, and any mortgage or loan paid out of the sale.';
+  }
+  function dispChanged(e) { if (!e || e.target.type === 'text' || e.target.type === 'number') dispExample = false; drawDisposal(); persist(); }
+  const dform = $('disposal-form');
+  dform.addEventListener('input', e => {
+    const id = e.target.id;
+    if (isMoney(e.target)) regroup(e.target);
+    if (id === 'd-value' || id === 'd-acb' || id === 'd-costs') autoGain();
+    dispChanged(e);
+  });
+  dform.addEventListener('change', e => {
+    const id = e.target.id;
+    if (id === 'd-prov-a' && !provTouched) $('d-prov-b').value = $('d-prov-a').value;
+    if (id === 'd-prov-b') provTouched = true;
+    dispChanged(e);
+  });
 
   /* ---------- run ---------- */
   let state = null, job = 0;
@@ -1583,7 +1786,7 @@ const Engine = (() => {
     recalc();
   });
   for (const id of ['fan-real', 'fan-nominal']) $(id).addEventListener('change', e => { fanNominal = e.target.value === 'nominal'; if (state) drawFan(state.p, state.mc); persist(); });
-  for (const id of ['tab-plan', 'tab-budget']) $(id).addEventListener('change', e => { setView(e.target.value); persist(); });
+  for (const id of ['tab-plan', 'tab-budget', 'tab-disposal']) $(id).addEventListener('change', e => { setView(e.target.value); persist(); });
   for (const id of ['mode-joint', 'mode-a', 'mode-b']) $(id).addEventListener('change', recalc);
   $('in-crash-when').addEventListener('change', () => { $('example-note').hidden = true; recalc(); });
   $('add-prop').addEventListener('click', () => {
@@ -1618,6 +1821,7 @@ const Engine = (() => {
     fanNominal = saved.fanNominal === true;
     fill(last); applyMode(last.mode); $('example-note').hidden = true; }
   else fill(EXAMPLE);
+  dispExample = !(saved && saved.disposal); fillDisp(saved && saved.disposal); drawDisposal();
   budget = normBudget(saved && saved.budget); drawBudget();
   setView(saved && saved.view);
   recalc();
