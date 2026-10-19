@@ -167,6 +167,12 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .b-link button { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 .b-link button:hover { color: var(--on-accent); opacity: 0.9; }
 
+/* Sharing */
+#share-btn { margin-left: auto; font-size: 0.86rem; padding: 5px 11px; }
+@media (max-width: 640px) { #share-btn { margin-left: 0; } }
+.shared-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 14px; background: var(--accent-soft); border-color: transparent; padding: 12px 16px; }
+.shared-note p { margin: 0; font-size: 0.9rem; color: var(--ink); }
+.shared-note .actions-inline { display: flex; gap: 8px; flex-wrap: wrap; }
 /* Asset disposal tab */
 .d-form fieldset:first-of-type { border-top: 0; }
 .d-form .example-note { border-radius: 10px 10px 0 0; }
@@ -300,6 +306,7 @@ details summary { cursor: pointer; font-weight: 600; }
       <label><input type="radio" name="view" id="tab-budget" value="budget"><span>Budget</span></label>
       <label><input type="radio" name="view" id="tab-disposal" value="disposal"><span>Asset disposal</span></label>
     </div>
+    <button type="button" id="share-btn" title="Copy a link that opens this page with everything you have entered">Copy share link</button>
     <div class="scenario">
       <span id="scenario-label">Scenario</span>
       <div class="segments" role="radiogroup" aria-labelledby="scenario-label">
@@ -308,6 +315,11 @@ details summary { cursor: pointer; font-weight: 600; }
         <label><input type="radio" name="mode" id="mode-b" value="b"><span>Spouse</span></label>
       </div>
     </div>
+  </div>
+
+  <div class="panel shared-note" id="shared-note" hidden>
+    <p>You are looking at numbers from a shared link. They are not saved on this device unless you keep them.</p>
+    <div class="actions-inline"><button type="button" id="shared-keep">Keep them as mine</button><button type="button" id="shared-drop">Go back to my own</button></div>
   </div>
 
   <div class="layout">
@@ -1056,7 +1068,9 @@ const Engine = (() => {
   let autoPick = 'bracket';   // the order Automatic chose last time, used for the first draw
   const STORE = 'retirement-income-simulator-couple-v1';
   /* Everything typed, on either tab, is saved together in this browser. */
-  function persist() { try { localStorage.setItem(STORE, JSON.stringify(Object.assign({}, last, { budget, view, fanNominal, autoPick, orderV: 2, spendBy, disposal: dispExample ? undefined : dispState() }))); } catch (e) {} }
+  let fromLink = false;   // true while showing numbers from a shared link that have not been kept
+  const snapshot = () => Object.assign({}, last, { budget, view, fanNominal, autoPick, orderV: 2, spendBy, disposal: dispExample ? undefined : dispState() });
+  function persist() { if (fromLink) return; try { localStorage.setItem(STORE, JSON.stringify(snapshot())); } catch (e) {} }
 
   const money = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0, currencyDisplay: 'narrowSymbol' });
   const fmt = v => money.format(Math.round(v));
@@ -1914,6 +1928,12 @@ const Engine = (() => {
 
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) {}
+  const toB64 = obj => { const bytes = new TextEncoder().encode(JSON.stringify(obj)); let bin = ''; for (const b of bytes) bin += String.fromCharCode(b); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  const fromB64 = t => { const bin = atob(t.replace(/-/g, '+').replace(/_/g, '/')); return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)))); };
+  try {
+    const m = /^#s=([A-Za-z0-9_-]+)$/.exec(location.hash);
+    if (m) { const shared = fromB64(m[1]); if (shared && shared.a && shared.b) { saved = shared; fromLink = true; $('shared-note').hidden = false; } }
+  } catch (e) {}
   if (saved && saved.a && saved.b) { last = Object.assign(clone(EXAMPLE), saved, { mode: COPY[saved.mode] ? saved.mode : 'joint', a: Object.assign({}, PERSON_A, saved.a), b: Object.assign({}, PERSON_B, saved.b) }); spendBy = Object.assign({}, SPEND, saved.spendBy);
     if (!Array.isArray(saved.properties)) {
       const rent = +saved.rent || 0, sale = +saved.sale || 0, year = sale > 0 && saved.saleYear ? saved.saleYear : null;
@@ -1938,6 +1958,15 @@ const Engine = (() => {
   budget = normBudget(saved && saved.budget); drawBudget();
   setView(saved && saved.view);
   recalc();
+  $('share-btn').addEventListener('click', async () => {
+    const link = location.origin + location.pathname + '#s=' + toB64(snapshot()), btn = $('share-btn');
+    let ok = false;
+    try { await navigator.clipboard.writeText(link); ok = true; } catch (e) {}
+    if (!ok) { window.prompt('Copy this link. It contains every number you have entered.', link); return; }
+    btn.textContent = 'Link copied'; setTimeout(() => { btn.textContent = 'Copy share link'; }, 2200);
+  });
+  $('shared-keep').addEventListener('click', () => { fromLink = false; $('shared-note').hidden = true; history.replaceState(null, '', location.pathname); persist(); });
+  $('shared-drop').addEventListener('click', () => { history.replaceState(null, '', location.pathname); location.reload(); });
 
   let lastW = 0;
   new ResizeObserver(() => {
