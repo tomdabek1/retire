@@ -176,6 +176,8 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 /* Rental summary tab */
 .rentals .panel { max-width: 980px; }
 .r-scroll { overflow-x: auto; margin-top: 4px; }
+.r-h { margin: 18px 0 0; font-size: 0.78rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
+.r-toggle { margin-top: 14px; }
 .r-table { min-width: 640px; }
 .r-table th:first-child, .r-table td:first-child { text-align: left; }
 .r-table tfoot td { font-weight: 600; color: var(--ink); border-top: 2px solid var(--line-strong); }
@@ -592,7 +594,13 @@ details summary { cursor: pointer; font-weight: 600; }
       <div class="odds-label">a month before income tax</div>
       <p class="odds-text" id="r-year"></p>
       <div class="b-bars" id="r-bars"></div>
+      <h3 class="r-h">Per month</h3>
       <div class="r-scroll"><table class="d-table r-table" id="r-table"><thead></thead><tbody></tbody></table></div>
+      <button type="button" id="r-toggle" class="r-toggle" aria-expanded="false">Show the yearly figures</button>
+      <div id="r-yearly" hidden>
+        <h3 class="r-h">Per year</h3>
+        <div class="r-scroll"><table class="d-table r-table" id="r-table-yr"><thead></thead><tbody></tbody></table></div>
+      </div>
       <p class="hint d-note" id="r-note"></p>
     </section>
   </div>
@@ -1864,6 +1872,7 @@ const Engine = (() => {
     delete dispSaved[name]; syncSaved(''); drawRentals(); persist();
   });
   /* Rental summary: every saved property with rent, before income tax (each saved view has its own income, so tax can't be added up). */
+  let yearlyShown = false;
   function drawRentals() {
     const rows = Object.entries(dispSaved).map(([name, d]) => {
       d = Object.assign({}, DISPOSAL_EXAMPLE, d); const f = rentFlows(d);
@@ -1881,26 +1890,36 @@ const Engine = (() => {
       fill.style.width = (Math.abs(r.f.cash) / top * 100) + '%'; track.appendChild(fill);
       row.append(el('span', null, r.name), track, el('b', null, (r.f.cash < 0 ? '−' : '') + fmt(Math.abs(r.f.cash) / 12))); bars.appendChild(row);
     }
-    const head = $('r-table').tHead, body = $('r-table').tBodies[0]; head.replaceChildren(); body.replaceChildren();
-    const old = $('r-table').tFoot; if (old) old.remove();
-    $('r-table').hidden = !rows.length;
-    if (!rows.length) { $('r-note').textContent = ''; return; }
-    const hr = el('tr'); for (const h of ['Property', 'Rent collected', 'Expenses', 'Net operating income', 'Mortgage payments', 'Cash flow a year', 'Cash flow a month', 'Cap rate']) hr.appendChild(el('th', null, h)); head.appendChild(hr);
+    $('r-table').hidden = !rows.length; $('r-yearly').hidden = !rows.length || !yearlyShown; $('r-toggle').hidden = !rows.length;
+    $('r-note').textContent = '';
+    if (!rows.length) return;
     const sg = v => (v < -0.5 ? '−' + fmt(-v) : fmt(Math.abs(v) < 0.5 ? 0 : v));
-    const line = (tr, vals) => { for (const v of vals) tr.appendChild(el('td', null, v)); return tr; };
     const cap = r => r.value > 0 ? (r.f.noi / r.value * 100).toFixed(1) + '%' : '–';
-    for (const r of rows) {
-      const tr = el('tr'), td = el('td'), b = el('button', 'linkish', r.name); b.type = 'button'; b.title = 'Open this property';
-      b.addEventListener('click', () => { loadProperty(r.name); setView('disposal'); persist(); });
-      td.appendChild(b); tr.appendChild(td);
-      line(tr, [fmt(r.f.eff), sg(-r.expenses), sg(r.f.noi), sg(-r.mortgage), sg(r.f.cash), sg(r.f.cash / 12), cap(r)]); body.appendChild(tr);
-    }
-    const foot = el('tfoot'), ft = el('tr'); ft.appendChild(el('td', null, 'Total'));
     const withValue = rows.filter(r => r.value > 0), vSum = withValue.reduce((a, r) => a + r.value, 0), nSum = withValue.reduce((a, r) => a + r.f.noi, 0);
-    line(ft, [fmt(sum(r => r.f.eff)), sg(-sum(r => r.expenses)), sg(sum(r => r.f.noi)), sg(-sum(r => r.mortgage)), sg(cash), sg(cash / 12), vSum > 0 ? (nSum / vSum * 100).toFixed(1) + '%' : '–']);
-    foot.appendChild(ft); $('r-table').appendChild(foot);
+    /* The same table twice: per month (always shown) and per year (behind a button). */
+    const build = (table, div, cashLabel) => {
+      const head = table.tHead, body = table.tBodies[0]; head.replaceChildren(); body.replaceChildren();
+      if (table.tFoot) table.tFoot.remove();
+      const hr = el('tr'); for (const h of ['Property', 'Rent collected', 'Expenses', 'Net operating income', 'Mortgage payments', cashLabel, 'Cap rate']) hr.appendChild(el('th', null, h)); head.appendChild(hr);
+      const line = (tr, vals) => { for (const v of vals) tr.appendChild(el('td', null, v)); return tr; };
+      for (const r of rows) {
+        const tr = el('tr'), td = el('td'), b = el('button', 'linkish', r.name); b.type = 'button'; b.title = 'Open this property';
+        b.addEventListener('click', () => { loadProperty(r.name); setView('disposal'); persist(); });
+        td.appendChild(b); tr.appendChild(td);
+        line(tr, [fmt(r.f.eff / div), sg(-r.expenses / div), sg(r.f.noi / div), sg(-r.mortgage / div), sg(r.f.cash / div), cap(r)]); body.appendChild(tr);
+      }
+      const foot = el('tfoot'), ft = el('tr'); ft.appendChild(el('td', null, 'Total'));
+      line(ft, [fmt(sum(r => r.f.eff) / div), sg(-sum(r => r.expenses) / div), sg(sum(r => r.f.noi) / div), sg(-sum(r => r.mortgage) / div), sg(cash / div), vSum > 0 ? (nSum / vSum * 100).toFixed(1) + '%' : '–']);
+      foot.appendChild(ft); table.appendChild(foot);
+    };
+    build($('r-table'), 12, 'Cash flow a month');
+    build($('r-table-yr'), 1, 'Cash flow a year');
     $('r-note').textContent = 'Only saved properties are counted, using the figures as last saved. Rent collected is after the vacancy allowance. Expenses are property management plus every expense line. The mortgage is shown separately. Cap rate is net operating income divided by the sale price you entered, and the total covers the properties that have a price. Income tax is left out because each saved property carries its own income figure. Click a property to open it.';
   }
+  $('r-toggle').addEventListener('click', () => {
+    yearlyShown = !yearlyShown; $('r-yearly').hidden = !yearlyShown;
+    $('r-toggle').textContent = yearlyShown ? 'Hide the yearly figures' : 'Show the yearly figures'; $('r-toggle').setAttribute('aria-expanded', String(yearlyShown));
+  });
   function dispChanged(e) { if (!e || e.target.type === 'text' || e.target.type === 'number') dispExample = false; drawDisposal(); persist(); }
   const dform = $('disposal-form');
   $('d-exp-add').addEventListener('click', () => { $('d-exp').appendChild(expRow({ name: '', amt: 0, per: 'm', custom: true })); const last = $('d-exp').lastChild; last.querySelector('input').focus(); dispChanged(); });
