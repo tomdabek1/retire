@@ -168,8 +168,14 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .b-link button:hover { color: var(--on-accent); opacity: 0.9; }
 
 /* Sharing */
-#share-btn { margin-left: auto; font-size: 0.86rem; padding: 5px 11px; }
-@media (max-width: 640px) { #share-btn { margin-left: 0; } }
+.share-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.share-actions button { font-size: 0.86rem; padding: 5px 11px; }
+@media (max-width: 640px) { .share-actions { margin-left: 0; } }
+.paste-box { margin-bottom: 14px; display: grid; gap: 10px; }
+.paste-box p { margin: 0; font-size: 0.9rem; color: var(--ink-2); }
+.paste-box textarea { width: 100%; min-height: 84px; resize: vertical; box-sizing: border-box; font: inherit; font-size: 0.86rem; color: var(--ink); background: var(--field); border: 1px solid var(--line-strong); border-radius: 6px; padding: 8px 10px; word-break: break-all; }
+.paste-box .actions-inline { display: flex; gap: 8px; flex-wrap: wrap; }
+.paste-box .err { color: var(--crit); font-weight: 500; }
 .shared-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 14px; background: var(--accent-soft); border-color: transparent; padding: 12px 16px; }
 .shared-note p { margin: 0; font-size: 0.9rem; color: var(--ink); }
 .shared-note .actions-inline { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -320,7 +326,10 @@ details summary { cursor: pointer; font-weight: 600; }
       <label><input type="radio" name="view" id="tab-disposal" value="disposal"><span>Asset disposal</span></label>
       <label><input type="radio" name="view" id="tab-rentals" value="rentals"><span>Rental summary</span></label>
     </div>
-    <button type="button" id="share-btn" title="Copy a link that opens this page with everything you have entered">Copy share link</button>
+    <div class="share-actions">
+      <button type="button" id="share-btn" title="Copy a link that opens this page with everything you have entered">Copy share link</button>
+      <button type="button" id="paste-btn" title="Paste a share link to load the numbers from another device">Paste share link</button>
+    </div>
     <div class="scenario">
       <span id="scenario-label">Scenario</span>
       <div class="segments" role="radiogroup" aria-labelledby="scenario-label">
@@ -329,6 +338,13 @@ details summary { cursor: pointer; font-weight: 600; }
         <label><input type="radio" name="mode" id="mode-b" value="b"><span>Spouse</span></label>
       </div>
     </div>
+  </div>
+
+  <div class="panel paste-box" id="paste-box" hidden>
+    <p>Paste a share link made on another device. Its numbers will replace the ones saved on this device, including your budget and saved properties.</p>
+    <textarea id="paste-text" placeholder="https://…#s=…" aria-label="Share link" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+    <p class="err" id="paste-err" hidden></p>
+    <div class="actions-inline"><button type="button" id="paste-clip">Paste from clipboard</button><button type="button" id="paste-load">Load these numbers</button><button type="button" id="paste-cancel">Cancel</button></div>
   </div>
 
   <div class="panel shared-note" id="shared-note" hidden>
@@ -2095,6 +2111,24 @@ const Engine = (() => {
     try { await navigator.clipboard.writeText(link); ok = true; } catch (e) {}
     if (!ok) { window.prompt('Copy this link. It contains every number you have entered.', link); return; }
     btn.textContent = 'Link copied'; setTimeout(() => { btn.textContent = 'Copy share link'; }, 2200);
+  });
+  const pasteBox = $('paste-box'), pasteErr = $('paste-err');
+  const pasteFail = msg => { pasteErr.textContent = msg; pasteErr.hidden = false; };
+  $('paste-btn').addEventListener('click', () => { pasteBox.hidden = !pasteBox.hidden; pasteErr.hidden = true; if (!pasteBox.hidden) $('paste-text').focus(); });
+  $('paste-cancel').addEventListener('click', () => { pasteBox.hidden = true; $('paste-text').value = ''; pasteErr.hidden = true; });
+  $('paste-clip').addEventListener('click', async () => {
+    try { $('paste-text').value = await navigator.clipboard.readText(); pasteErr.hidden = true; } catch (e) { pasteFail('This browser would not let the page read the clipboard. Press and hold in the box above and choose Paste.'); }
+  });
+  $('paste-load').addEventListener('click', () => {
+    const text = $('paste-text').value.trim();
+    const m = text.match(/(?:^|[#?&\s])s=([A-Za-z0-9_-]+)/) || text.match(/^(eyJ[A-Za-z0-9_-]+)$/);
+    if (!m) { pasteFail('That does not look like a share link. Use the "Copy share link" button on the other device and paste the whole link.'); return; }
+    let data;
+    try { data = fromB64(m[1]); } catch (e) { data = null; }
+    if (!data || !data.a || !data.b) { pasteFail('The link was cut off or damaged. Copy it again and paste the whole thing.'); return; }
+    if (!window.confirm('Replace the numbers on this device with the ones in the link?')) return;
+    try { localStorage.setItem(STORE, JSON.stringify(data)); } catch (e) { pasteFail('This browser would not save the numbers.'); return; }
+    history.replaceState(null, '', location.pathname); location.reload();
   });
   $('shared-keep').addEventListener('click', () => { fromLink = false; $('shared-note').hidden = true; history.replaceState(null, '', location.pathname); persist(); });
   $('shared-drop').addEventListener('click', () => { history.replaceState(null, '', location.pathname); location.reload(); });
