@@ -345,7 +345,7 @@ details summary { cursor: pointer; font-weight: 600; }
         </div>
         <dl class="stats">
           <div class="stat"><dt id="st-ret-label">Median savings when you have both retired</dt><dd id="st-ret">–</dd><span class="sub" id="st-ret-sub"></span></div>
-          <div class="stat"><dt>Spending that holds up in 9 of 10 paths</dt><dd id="st-safe">–</dd><span class="sub" id="st-safe-sub"></span></div>
+          <div class="stat"><dt>Highest monthly spending that holds up in 9 of 10 paths</dt><dd id="st-safe">–</dd><span class="sub" id="st-safe-sub"></span></div>
           <div class="stat"><dt id="st-end-label">Median left at the end</dt><dd id="st-end">–</dd><span class="sub">before tax on any remaining RRSP</span></div>
         </dl>
       </div>
@@ -1492,12 +1492,13 @@ const Engine = (() => {
     const b = mc.bands, n = b[0].length, ri = Engine.drawStartIndex(p);
     $('odds-num').textContent = pct + '%';
     const endA = p.people[0].age + n - 1;
-    $('odds-label').textContent = mode === 'a' ? `chance your money lasts until you are ${endA}` : mode === 'b' ? `chance your spouse's money lasts until they are ${endA}`
-      : `chance your money lasts until you are ${endA} and your spouse is ${p.people[1].age + n - 1}`;
+    const budget = `, spending ${fmt(p.spending / 12)} a month`;
+    $('odds-label').textContent = (mode === 'a' ? `chance your money lasts until you are ${endA}` : mode === 'b' ? `chance your spouse's money lasts until they are ${endA}`
+      : `chance your money lasts until you are ${endA} and your spouse is ${p.people[1].age + n - 1}`) + budget;
     const detail = (p.spendCut ? ', less once budget lines end' : '') + (p.rule ? ', less in years after a market fall' : '');
     $('crash-hint').hidden = !p.crash;
     if (p.crash) $('crash-hint').textContent = 'Every path has the portfolio fall ' + Math.round(p.crash.drop * 100) + '% in ' + (Y0 + p.crash.index) + ', on top of its ordinary ups and downs.';
-    let text = `${ok.toLocaleString('en-CA')} of ${PATHS.toLocaleString('en-CA')} simulated market paths paid ${fmt(p.spending)} a year after tax${detail}, through ${Y0 + n - 1}.`;
+    let text = `${ok.toLocaleString('en-CA')} of ${PATHS.toLocaleString('en-CA')} simulated market paths paid your budget of ${fmt(p.spending / 12)} a month (${fmt(p.spending)} a year) after tax${detail}, through ${Y0 + n - 1}.`;
     if (p.crash && mc.withoutCrash != null) text += ` That is with a ${Math.round(p.crash.drop * 100)}% crash forced in ${Y0 + p.crash.index}; without it the odds are ${Math.round(mc.withoutCrash * 100)}%.`;
     if (p.rule && mc.withoutRule != null) text += ` Without the down-year rule it would be ${Math.round(mc.withoutRule * 100)}%; the rule kicks in about ${mc.ruleYearsPerPath < 0.05 ? 'once in 20 retirements' : mc.ruleYearsPerPath.toFixed(1) + ' times per retirement'}.`;
     if (mc.medianFailIndex >= 0) text += ` In the paths that fell short, savings typically ran out around ${Y0 + mc.medianFailIndex}, at ${ages(p, mc.medianFailIndex)}.`;
@@ -1961,8 +1962,8 @@ const Engine = (() => {
       setTimeout(() => {
         if (mine !== job) return;
         const safe = Engine.sustainableSpending(p, SIDE_PATHS, 0.9);
-        $('st-safe').textContent = fmt(safe) + ' a year';
-        $('st-safe-sub').textContent = fmt(safe / 12) + ' a month after tax';
+        $('st-safe').textContent = fmt(safe / 12) + ' a month';
+        $('st-safe-sub').textContent = fmt(safe) + ' a year after tax';
         $('st-safe').classList.remove('pending');
         const list = [];
         for (let k = -3; k <= 3; k++) {
