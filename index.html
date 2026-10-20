@@ -189,6 +189,29 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .r-table tfoot td { font-weight: 600; color: var(--ink); border-top: 2px solid var(--line-strong); }
 .r-table .linkish { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .b-bar .fill.neg { background: var(--crit); }
+/* Phones: tighter tables, and the rental tables turned sideways (properties across the top) */
+@media (max-width: 560px) {
+  .d-table { font-size: 0.82rem; }
+  .d-table th { padding-left: 8px; }
+  .d-table td { padding: 6px 0 6px 8px; white-space: nowrap; }
+  .d-table td:first-child { padding-left: 0; white-space: normal; }
+  .d-table td:first-child { width: 38%; }
+  /* two owners plus a total: each row becomes a label with its three amounts underneath */
+  .d-table.stack thead tr, .d-table.stack tbody tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .d-table.stack th:first-child { display: none; }
+  .d-table.stack tbody tr { border-top: 1px solid var(--line); }
+  .d-table.stack td { border-top: 0; }
+  .d-table.stack td:first-child { grid-column: 1 / -1; width: auto; padding: 8px 0 0; }
+  .d-table.stack td:not(:first-child) { padding: 2px 0 8px 8px; }
+}
+.d-table th:nth-child(2), .d-table td:nth-child(2), .r-table th:nth-child(2), .r-table td:nth-child(2) { text-align: right; }
+.r-table.flip { min-width: 0; width: max-content; min-width: 100%; }
+.r-table.flip th, .r-table.flip td { min-width: 84px; padding-left: 10px; white-space: nowrap; }
+.r-table.flip th:first-child, .r-table.flip td:first-child { position: sticky; left: 0; z-index: 1; min-width: 92px; max-width: 92px; width: 92px; white-space: normal; background: var(--surface); padding-left: 0; }
+.r-table.flip th { white-space: normal; vertical-align: bottom; }
+.r-table.flip td:last-child, .r-table.flip th:last-child { font-weight: 600; color: var(--ink); }
+.r-table.flip tr.key td { font-weight: 600; color: var(--ink); }
+.r-table.flip .linkish { text-align: right; }
 /* Asset disposal tab */
 .d-form fieldset:first-of-type { border-top: 0; }
 .d-form .example-note { border-radius: 10px 10px 0 0; }
@@ -611,6 +634,7 @@ details summary { cursor: pointer; font-weight: 600; }
       <p class="odds-text" id="r-year"></p>
       <div class="b-bars" id="r-bars"></div>
       <h3 class="r-h">Per month</h3>
+      <p class="hint" id="r-swipe" hidden>Swipe the table sideways to see every property.</p>
       <div class="r-scroll"><table class="d-table r-table" id="r-table"><thead></thead><tbody></tbody></table></div>
       <button type="button" id="r-toggle" class="r-toggle" aria-expanded="false">Show the yearly figures</button>
       <div id="r-yearly" hidden>
@@ -682,12 +706,12 @@ details summary { cursor: pointer; font-weight: 600; }
       <p class="odds-text" id="d-pocket-sub"></p>
       <div class="d-split" id="d-split"></div>
       <div class="legend d-legend" id="d-legend"></div>
-      <table class="d-table" id="d-table"><thead></thead><tbody></tbody></table>
+      <div class="r-scroll"><table class="d-table" id="d-table"><thead></thead><tbody></tbody></table></div>
       <div class="d-keep" id="d-keep" hidden>
         <h3>Keep it or sell it</h3>
         <div class="d-versus" id="d-versus"></div>
         <p class="odds-text" id="d-verdict"></p>
-        <table class="d-table" id="d-cash"><thead></thead><tbody></tbody></table>
+        <div class="r-scroll"><table class="d-table" id="d-cash"><thead></thead><tbody></tbody></table></div>
         <dl class="stats" id="d-metrics"></dl>
       </div>
       <p class="hint d-note" id="d-note"></p>
@@ -1790,8 +1814,9 @@ const Engine = (() => {
     }
     // table
     const cols = d.joint ? [...owners, tot] : [tot];
+    $('d-table').classList.toggle('stack', d.joint);
     const head = $('d-table').tHead, body = $('d-table').tBodies[0]; head.replaceChildren(); body.replaceChildren();
-    if (d.joint) { const tr = el('tr'); for (const h of ['', 'You', 'Your spouse', 'Total']) tr.appendChild(el('th', null, h)); head.appendChild(tr); }
+    if (d.joint) { const tr = el('tr'); for (const h of ['', 'You', 'Spouse', 'Total']) tr.appendChild(el('th', null, h)); head.appendChild(tr); }
     const row = (name, f, cls) => { const tr = el('tr', cls); tr.appendChild(el('td', null, name)); for (const c of cols) tr.appendChild(el('td', null, f(c))); body.appendChild(tr); };
     const money = k => c => (c[k] == null ? '–' : fmt(c[k]));
     const isTot = c => c === tot;
@@ -1889,6 +1914,7 @@ const Engine = (() => {
   });
   /* Rental summary: every saved property with rent, before income tax (each saved view has its own income, so tax can't be added up). */
   let yearlyShown = false;
+  window.matchMedia('(max-width: 640px)').addEventListener('change', () => drawRentals());
   function drawRentals() {
     const rows = Object.entries(dispSaved).map(([name, d]) => {
       d = Object.assign({}, DISPOSAL_EXAMPLE, d); const f = rentFlows(d);
@@ -1913,21 +1939,32 @@ const Engine = (() => {
     const cap = r => r.value > 0 ? (r.f.noi / r.value * 100).toFixed(1) + '%' : '–';
     const withValue = rows.filter(r => r.value > 0), vSum = withValue.reduce((a, r) => a + r.value, 0), nSum = withValue.reduce((a, r) => a + r.f.noi, 0);
     /* The same table twice: per month (always shown) and per year (behind a button). */
+    const narrow = window.matchMedia('(max-width: 640px)').matches;
     const build = (table, div, cashLabel) => {
       const head = table.tHead, body = table.tBodies[0]; head.replaceChildren(); body.replaceChildren();
       if (table.tFoot) table.tFoot.remove();
-      const hr = el('tr'); for (const h of ['Property', 'Rent collected', 'Expenses', 'Net operating income', 'Mortgage payments', cashLabel, 'Cap rate']) hr.appendChild(el('th', null, h)); head.appendChild(hr);
-      const line = (tr, vals) => { for (const v of vals) tr.appendChild(el('td', null, v)); return tr; };
-      for (const r of rows) {
-        const tr = el('tr'), td = el('td'), b = el('button', 'linkish', r.name); b.type = 'button'; b.title = 'Open this property';
-        b.addEventListener('click', () => { loadProperty(r.name); setView('disposal'); persist(); });
-        td.appendChild(b); tr.appendChild(td);
-        line(tr, [fmt(r.f.eff / div), sg(-r.expenses / div), sg(r.f.noi / div), sg(-r.mortgage / div), sg(r.f.cash / div), cap(r)]); body.appendChild(tr);
+      table.classList.toggle('flip', narrow);
+      const open = (name) => { const b = el('button', 'linkish', name); b.type = 'button'; b.title = 'Open this property'; b.addEventListener('click', () => { loadProperty(name); setView('disposal'); persist(); }); return b; };
+      const labels = ['Rent collected', 'Expenses', 'Net operating income', 'Mortgage payments', cashLabel, 'Cap rate'];
+      const valuesFor = r => [fmt(r.f.eff / div), sg(-r.expenses / div), sg(r.f.noi / div), sg(-r.mortgage / div), sg(r.f.cash / div), cap(r)];
+      const totalVals = [fmt(sum(r => r.f.eff) / div), sg(-sum(r => r.expenses) / div), sg(sum(r => r.f.noi) / div), sg(-sum(r => r.mortgage) / div), sg(cash / div), vSum > 0 ? (nSum / vSum * 100).toFixed(1) + '%' : '–'];
+      if (narrow) {
+        const hr = el('tr'); hr.appendChild(el('th')); for (const r of rows) { const th = el('th'); th.appendChild(open(r.name)); hr.appendChild(th); } hr.appendChild(el('th', null, 'Total')); head.appendChild(hr);
+        const cols = rows.map(valuesFor);
+        labels.forEach((label, i) => {
+          const tr = el('tr', i === 4 ? 'key' : null); tr.appendChild(el('td', null, label));
+          for (const c of cols) tr.appendChild(el('td', null, c[i]));
+          tr.appendChild(el('td', null, totalVals[i])); body.appendChild(tr);
+        });
+        return;
       }
+      const hr = el('tr'); for (const h of ['Property', ...labels]) hr.appendChild(el('th', null, h)); head.appendChild(hr);
+      const line = (tr, vals) => { for (const v of vals) tr.appendChild(el('td', null, v)); return tr; };
+      for (const r of rows) { const tr = el('tr'), td = el('td'); td.appendChild(open(r.name)); tr.appendChild(td); line(tr, valuesFor(r)); body.appendChild(tr); }
       const foot = el('tfoot'), ft = el('tr'); ft.appendChild(el('td', null, 'Total'));
-      line(ft, [fmt(sum(r => r.f.eff) / div), sg(-sum(r => r.expenses) / div), sg(sum(r => r.f.noi) / div), sg(-sum(r => r.mortgage) / div), sg(cash / div), vSum > 0 ? (nSum / vSum * 100).toFixed(1) + '%' : '–']);
-      foot.appendChild(ft); table.appendChild(foot);
+      line(ft, totalVals); foot.appendChild(ft); table.appendChild(foot);
     };
+    $('r-swipe').hidden = !(narrow && rows.length > 2);
     build($('r-table'), 12, 'Cash flow a month');
     build($('r-table-yr'), 1, 'Cash flow a year');
     $('r-note').textContent = 'Only saved properties are counted, using the figures as last saved. Rent collected is after the vacancy allowance. Expenses are property management plus every expense line. The mortgage is shown separately. Cap rate is net operating income divided by the sale price you entered, and the total covers the properties that have a price. Income tax is left out because each saved property carries its own income figure. Click a property to open it.';
