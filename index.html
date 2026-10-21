@@ -590,7 +590,7 @@ details summary { cursor: pointer; font-weight: 600; }
           <ul>
             <li>Everyone lives in Ontario. A joint scenario taxes each spouse on their own income; an individual scenario models one person on their own, with that person's accounts, their side of each property and its own spending figure. Tax uses the 2026 federal and Ontario brackets, the basic, age and pension income credits, the Ontario surtax and health premium, and the OAS recovery tax on income above $95,323. Brackets are assumed to keep pace with inflation.</li>
             <li>The balances you enter are today's. The first year of the model is only the part of this calendar year that is left, so it gets that share of the expected return, of the swing, and of the year's saving and spending. Every later point on the charts is the start of a calendar year.</li>
-            <li>Each simulated year draws a return at random around your expected return, using the swing you set. All invested accounts earn the same return. Uninvested cash earns no interest, so it loses value to inflation, and it is spent first. Spending it triggers no tax.</li>
+            <li>Each simulated year draws a return at random around your expected return, using the swing you set. All invested accounts earn the same return. Uninvested cash earns no interest, so it loses value to inflation. It is a rainy-day reserve and is left alone: it is used only if every other source has run out, and what remains counts in your final balances. Spending it triggers no tax.</li>
             <li>In a joint scenario, pension income splitting is applied whenever it lowers your combined tax: up to half of workplace pension income at any age, and of RRSP or RRIF income from 65, moves to the lower-income spouse. RRSP withdrawals are drawn from whichever of you has the lower income first.</li>
             <li>In a joint scenario, savings are drawn from the year you have both retired. Before that, the model assumes the spouse still working covers your spending, and it ignores any CPP, OAS or pension the retired spouse receives.</li>
             <li>CPP is reduced 0.6% for each month it starts before 65 and raised 0.7% for each month after. OAS is $762.50 a month at 65 (October to December 2026), rises 0.6% for each month deferred, and rises 10% at 75.</li>
@@ -854,7 +854,7 @@ const Engine = (() => {
     const A = p.people[0], B = p.people[1];
     let rA = A.rrsp, rB = B.rrsp, tfsa = A.tfsa + B.tfsa;
     let nA = A.nonreg || 0, nB = B.nonreg || 0, acbA = nA, acbB = nB;   // non-registered balance and cost base, per person
-    let cash = (A.cash || 0) + (B.cash || 0);   // uninvested cash, pooled; earns CASH_RATE and is spent first
+    let cash = (A.cash || 0) + (B.cash || 0);   // uninvested cash, pooled; earns CASH_RATE and is a reserve used only as a last resort
     const cr = (1 + CASH_RATE) / (1 + p.inflation) - 1;
     /* Dividends: each person's non-registered account pays out a share of its balance in cash every year. That cash is part of
        the account's total return (so the balance grows by return minus yield), is taxed as eligible dividends, and is spent first. */
@@ -928,13 +928,13 @@ const Engine = (() => {
       const firstCap = p.strategy !== 'bracket' ? Infinity : p.single ? Math.max(0, O.brackets[0][0] - tA0) : Math.max(0, 2 * O.brackets[0][0] - tA0 - tB0);
 
       const alloc = x => {
-        let left = x; dR = 0; aN = 0; aT = 0;
-        aC = Math.min(left, cash); left -= aC;
+        let left = x; dR = 0; aN = 0; aT = 0; aC = 0;
         if (p.strategy !== 'taxable') { dR = Math.min(left, availR, firstCap); left -= dR; }
         aN = Math.min(left, nonreg); left -= aN;
         if (p.strategy === 'taxable') { const d = Math.min(left, availR); dR += d; left -= d; }
         aT = Math.min(left, tfsa); left -= aT;
-        if (left > 0) dR += Math.min(left, availR - dR);
+        if (left > 0) { const d = Math.min(left, availR - dR); dR += d; left -= d; }
+        aC = Math.min(left, cash);   // cash is a reserve: touched only when everything else has run out
         // non-registered withdrawals come from each person in proportion to their balance
         aNA = nonreg > 0 ? aN * navA / nonreg : 0; aNB = aN - aNA;
         // split the RRSP draw so the two taxable incomes end up as close as the balances allow
