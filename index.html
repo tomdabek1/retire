@@ -440,7 +440,7 @@ details summary { cursor: pointer; font-weight: 600; }
           <div class="pair"><span class="pair-label" id="lb-div">Dividends it pays per year</span>
             <div class="control"><span class="affix">$</span><input id="a-div" aria-label="Dividends from non-registered, you" type="text" data-money inputmode="numeric" step="500"></div>
             <div class="control"><span class="affix">$</span><input id="b-div" aria-label="Dividends from non-registered, your spouse" type="text" data-money inputmode="numeric" step="500"></div></div>
-          <p class="hint">Canadian dividends that land in the account as cash. They are spent first, taxed as eligible dividends, and are part of the account's total return, so the rest of it grows by the return minus this yield.</p>
+          <p class="hint">Canadian dividends that land in the account as cash. They are spent first, taxed as eligible dividends, and are part of the account's total return, so the rest of it grows by the return minus this yield. The dividend rises with inflation, and shrinks only as you sell those shares. New savings and sale proceeds don't pay it.</p>
           <div class="pair"><span class="pair-label">Cash (not invested)</span>
             <div class="control"><span class="affix">$</span><input id="a-cash" aria-label="Cash, you" type="text" data-money inputmode="numeric" step="5000"></div>
             <div class="control"><span class="affix">$</span><input id="b-cash" aria-label="Cash, your spouse" type="text" data-money inputmode="numeric" step="5000"></div></div>
@@ -860,6 +860,9 @@ const Engine = (() => {
        the account's total return (so the balance grows by return minus yield), is taxed as eligible dividends, and is spent first. */
     const yA = A.div > 0 && A.nonreg > 0 ? Math.min(0.2, A.div / A.nonreg) : 0, yB = B.div > 0 && B.nonreg > 0 ? Math.min(0.2, B.div / B.nonreg) : 0;
     const dTax = p.divTax != null ? p.divTax : 0.15;   // tax rate on dividends in the years before savings are drawn
+    /* The dividend itself is a fixed amount in today's dollars, so it rises with inflation. It falls only as the shares are sold. */
+    const dvA = yA > 0 ? A.div : 0, dvB = yB > 0 ? B.div : 0;
+    let shA = 1, shB = 1;   // share of the original dividend-paying holding still owned
     let pA = A.nonreg || 0, pB = B.nonreg || 0;   // the part of each non-registered account that holds the dividend payers; new savings and sale proceeds do not pay this yield
     let dedA = 0, dedB = 0;   // RRSP deductions from sale cash that have not been used against income yet
     const infl = 1 + p.inflation;
@@ -889,7 +892,7 @@ const Engine = (() => {
         const wA = ageA < A.retireAge, wB = ageB < B.retireAge;
         const cA = (wA ? A.cNonreg || 0 : 0) * fr, cB = (wB ? B.cNonreg || 0 : 0) * fr;
         const kA = (wA ? A.cRrsp : 0) * fr, kB = (wB ? B.cRrsp : 0) * fr, kT = ((wA ? A.cTfsa : 0) + (wB ? B.cTfsa : 0)) * fr;
-        const vA = yA * pA * fr, vB = yB * pB * fr, tdA = vA * dTax, tdB = vB * dTax;   // dividends are taxed, and what is left is reinvested
+        const vA = Math.min(dvA * shA, 0.2 * pA) * fr, vB = Math.min(dvB * shB, 0.2 * pB) * fr, tdA = vA * dTax, tdB = vB * dTax;   // dividends are taxed, and what is left is reinvested
         if (rows) rows.push({ i, ageA, ageB, phase: 'saving', start: startTotal, bal: [rA, rB, tfsa, nA, nB, cash],
           added: sold + kA + kB + kT + cA + cB, out: tdA + tdB, growth: (startTotal - cash) * r + cash * (Math.pow(1 + cr, fr) - 1) });
         rA = rA * (1 + r) + kA;
@@ -909,7 +912,7 @@ const Engine = (() => {
       const availA = rA - minA, availB = rB - minB, availR = availA + availB;
       const rentA = rentsA ? rentsA[i] : 0, rentB = rentsB ? rentsB[i] : 0, rent = rentA + rentB;
       const baseA = cppA + dbA + minA + rentA, baseB = cppB + dbB + minB + rentB;
-      const vA = yA * pA, vB = yB * pB;   // dividends this year, at the full-year rate
+      const vA = Math.min(dvA * shA, 0.2 * pA), vB = Math.min(dvB * shB, 0.2 * pB);   // dividends this year, at the full-year rate
       const nA0 = baseA + oasA, nB0 = baseB + oasB;
       const tA0 = nA0 + DIV_GROSS * vA, tB0 = nB0 + DIV_GROSS * vB;   // taxable income before any withdrawals
       const navA = Math.max(0, nA - vA), navB = Math.max(0, nB - vB), nonreg = navA + navB;   // shares left to sell once the dividends are out
@@ -991,8 +994,8 @@ const Engine = (() => {
         bal: [rA, rB, tfsa, nA, nB, cash], added: sold + surplus * fr, out: (minA + minB + dR + aN + aT + aC + vA + vB) * fr, ruleHit });
 
       rA -= (minA + dA) * fr; rB -= (minB + dB) * fr;
-      if (aNA > 0) { const f1 = aNA * fr; pA -= pA * (f1 / nA); acbA -= acbA * (f1 / nA); nA -= f1; }
-      if (aNB > 0) { const f1 = aNB * fr; pB -= pB * (f1 / nB); acbB -= acbB * (f1 / nB); nB -= f1; }
+      if (aNA > 0) { const f1 = aNA * fr; shA *= 1 - f1 / nA; pA -= pA * (f1 / nA); acbA -= acbA * (f1 / nA); nA -= f1; }
+      if (aNB > 0) { const f1 = aNB * fr; shB *= 1 - f1 / nB; pB -= pB * (f1 / nB); acbB -= acbB * (f1 / nB); nB -= f1; }
       tfsa -= aT * fr; cash -= aC * fr;
       dedA -= uA * fr; dedB -= uB * fr;
       const sur = surplus * fr;
