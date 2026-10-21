@@ -860,6 +860,7 @@ const Engine = (() => {
        the account's total return (so the balance grows by return minus yield), is taxed as eligible dividends, and is spent first. */
     const yA = A.div > 0 && A.nonreg > 0 ? Math.min(0.2, A.div / A.nonreg) : 0, yB = B.div > 0 && B.nonreg > 0 ? Math.min(0.2, B.div / B.nonreg) : 0;
     const dTax = p.divTax != null ? p.divTax : 0.15;   // tax rate on dividends in the years before savings are drawn
+    let pA = A.nonreg || 0, pB = B.nonreg || 0;   // the part of each non-registered account that holds the dividend payers; new savings and sale proceeds do not pay this yield
     let dedA = 0, dedB = 0;   // RRSP deductions from sale cash that have not been used against income yet
     const infl = 1 + p.inflation;
     const frac0 = p.firstFrac > 0 && p.firstFrac < 1 ? p.firstFrac : 1;   // share of the first model year that is still ahead of us
@@ -888,13 +889,13 @@ const Engine = (() => {
         const wA = ageA < A.retireAge, wB = ageB < B.retireAge;
         const cA = (wA ? A.cNonreg || 0 : 0) * fr, cB = (wB ? B.cNonreg || 0 : 0) * fr;
         const kA = (wA ? A.cRrsp : 0) * fr, kB = (wB ? B.cRrsp : 0) * fr, kT = ((wA ? A.cTfsa : 0) + (wB ? B.cTfsa : 0)) * fr;
-        const vA = yA * nA * fr, vB = yB * nB * fr, tdA = vA * dTax, tdB = vB * dTax;   // dividends are taxed, and what is left is reinvested
+        const vA = yA * pA * fr, vB = yB * pB * fr, tdA = vA * dTax, tdB = vB * dTax;   // dividends are taxed, and what is left is reinvested
         if (rows) rows.push({ i, ageA, ageB, phase: 'saving', start: startTotal, bal: [rA, rB, tfsa, nA, nB, cash],
           added: sold + kA + kB + kT + cA + cB, out: tdA + tdB, growth: (startTotal - cash) * r + cash * (Math.pow(1 + cr, fr) - 1) });
         rA = rA * (1 + r) + kA;
         rB = rB * (1 + r) + kB;
         tfsa = tfsa * (1 + r) + kT;
-        nA = nA * (1 + r) - tdA + cA; nB = nB * (1 + r) - tdB + cB; cash *= Math.pow(1 + cr, fr);
+        nA = nA * (1 + r) - tdA + cA; nB = nB * (1 + r) - tdB + cB; pA = pA * (1 + r) - tdA; pB = pB * (1 + r) - tdB; cash *= Math.pow(1 + cr, fr);
         acbA = acbA / inflF + cA + (vA - tdA); acbB = acbB / inflF + cB + (vB - tdB);
         dedA /= inflF; dedB /= inflF;
         continue;
@@ -908,7 +909,7 @@ const Engine = (() => {
       const availA = rA - minA, availB = rB - minB, availR = availA + availB;
       const rentA = rentsA ? rentsA[i] : 0, rentB = rentsB ? rentsB[i] : 0, rent = rentA + rentB;
       const baseA = cppA + dbA + minA + rentA, baseB = cppB + dbB + minB + rentB;
-      const vA = yA * nA, vB = yB * nB;   // dividends this year, at the full-year rate
+      const vA = yA * pA, vB = yB * pB;   // dividends this year, at the full-year rate
       const nA0 = baseA + oasA, nB0 = baseB + oasB;
       const tA0 = nA0 + DIV_GROSS * vA, tB0 = nB0 + DIV_GROSS * vB;   // taxable income before any withdrawals
       const navA = Math.max(0, nA - vA), navB = Math.max(0, nB - vB), nonreg = navA + navB;   // shares left to sell once the dividends are out
@@ -990,8 +991,8 @@ const Engine = (() => {
         bal: [rA, rB, tfsa, nA, nB, cash], added: sold + surplus * fr, out: (minA + minB + dR + aN + aT + aC + vA + vB) * fr, ruleHit });
 
       rA -= (minA + dA) * fr; rB -= (minB + dB) * fr;
-      if (aNA > 0) { const f1 = aNA * fr; acbA -= acbA * (f1 / nA); nA -= f1; }
-      if (aNB > 0) { const f1 = aNB * fr; acbB -= acbB * (f1 / nB); nB -= f1; }
+      if (aNA > 0) { const f1 = aNA * fr; pA -= pA * (f1 / nA); acbA -= acbA * (f1 / nA); nA -= f1; }
+      if (aNB > 0) { const f1 = aNB * fr; pB -= pB * (f1 / nB); acbB -= acbB * (f1 / nB); nB -= f1; }
       tfsa -= aT * fr; cash -= aC * fr;
       dedA -= uA * fr; dedB -= uB * fr;
       const sur = surplus * fr;
@@ -1003,6 +1004,7 @@ const Engine = (() => {
       if (row) row.growth = (Math.max(0, rA) + Math.max(0, rB) + Math.max(0, tfsa) + Math.max(0, nA) + Math.max(0, nB)) * r + Math.max(0, cash) * (Math.pow(1 + cr, fr) - 1);
       rA = Math.max(0, rA) * (1 + r); rB = Math.max(0, rB) * (1 + r);
       tfsa = Math.max(0, tfsa) * (1 + r); cash = Math.max(0, cash) * Math.pow(1 + cr, fr);
+      pA = Math.max(0, pA * (1 + r) - vA * fr); pB = Math.max(0, pB * (1 + r) - vB * fr);
       nA = Math.max(0, Math.max(0, nA) * (1 + r) - vA * fr); nB = Math.max(0, Math.max(0, nB) * (1 + r) - vB * fr);
       acbA /= inflF; acbB /= inflF; dedA /= inflF; dedB /= inflF;
     }
